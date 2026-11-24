@@ -1336,13 +1336,15 @@ function renderAccount() {
   }
   if (Cloud.pendingEmail) {
     el.innerHTML = `<p class="note">We've emailed a code to <b>${esc(Cloud.pendingEmail)}</b>. It can take a minute, so check your spam folder too.</p>
-      <div class="row" style="margin-top:10px"><input class="inp num" id="aCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Code from the email" aria-label="Code from the email"><button class="primary" id="aVerify">Sign in</button><button class="ghost" id="aBack">Use a different email</button></div>`;
+      <div class="row" style="margin-top:10px"><input class="inp num" id="aCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Code from the email" aria-label="Code from the email"><button class="primary" id="aVerify">Sign in</button></div>
+      <div class="row" style="margin-top:8px"><button class="ghost" id="aResend">Send a new code</button><button class="ghost" id="aBack">Use a different email</button></div>`;
+    $('#aResend').onclick = async () => { $('#aResend').disabled = true; try { await Cloud.sendCode(Cloud.pendingEmail); toast('New code sent. Use the newest email.'); } catch (e) { toast(/rate|seconds/i.test(e.message || '') ? 'Wait a minute before asking for another code' : (e.message || 'Couldn\'t send a new code')); } setTimeout(() => { if ($('#aResend')) $('#aResend').disabled = false; }, 60000); };
     $('#aVerify').onclick = async () => {
       const c = $('#aCode').value.replace(/\D/g, '');
       if (c.length < 6) { toast('Enter the code from the email'); return; }
       $('#aVerify').disabled = true;
       try { await Cloud.verify(Cloud.pendingEmail, c); Cloud.pendingEmail = null; toast('Signed in. Syncing your sessions…'); }
-      catch (e) { toast(e.message || 'That code didn\'t work'); }
+      catch (e) { toast(/expired|invalid/i.test(e.message || '') ? 'That code has expired or was already used. Tap "Send a new code".' : (e.message || 'That code didn\'t work'), 5000); }
       renderAccount(); renderStrava();
     };
     $('#aBack').onclick = () => { Cloud.pendingEmail = null; renderAccount(); };

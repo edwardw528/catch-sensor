@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Catch — paddle stroke analytics</title>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#f3f3f0; --card:#ffffff; --line:#e3e2dd; --grid:#ecebe7;
+  --text:#0b0b0b; --text2:#52514e; --muted:#85847f;
+  --L:#2a78d6; --R:#eb6834; --rate:#6250d6; --speed:#1baf7a;
+  --band:rgba(98,80,214,.09); --target:rgba(27,175,122,.12);
+  --good:#0a7d3c; --good-bg:#e7f5ec; --warn:#9a5b00; --warn-bg:#fdf1dc; --info:#3a3a38; --info-bg:#f0efeb;
+  --z1:#e1ddf8; --z2:#b8aff0; --z3:#8f80e3; --z4:#6250d6; --z5:#3d2e9a;
+  --btn:#0b0b0b; --btn-text:#ffffff; --danger:#c0392b;
+  --radius:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme: dark;
+    --bg:#101010; --card:#1a1a19; --line:#2d2d2b; --grid:#262624;
+    --text:#f0efec; --text2:#c3c2b7; --muted:#8d8c86;
+    --L:#3987e5; --R:#d95926; --rate:#9085e9; --speed:#199e70;
+    --band:rgba(144,133,233,.13); --target:rgba(25,158,112,.18);
+    --good:#5fd08f; --good-bg:#15291d; --warn:#f0b354; --warn-bg:#2e2310; --info:#d8d7d0; --info-bg:#232321;
+    --z1:#2c2850; --z2:#463d85; --z3:#6a5dc0; --z4:#9085e9; --z5:#c4bdf5;
+    --btn:#f0efec; --btn-text:#0b0b0b; --danger:#ff6b5b;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+header.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;padding:10px 20px;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:19px;letter-spacing:-.02em}
+.brand svg{width:26px;height:26px}
+nav#nav{display:flex;gap:4px;margin-left:12px}
+nav#nav button{border:0;background:none;padding:8px 12px;border-radius:999px;color:var(--text2);font-weight:600;cursor:pointer}
+nav#nav button.on{background:var(--text);color:var(--bg)}
+.pill{margin-left:auto;font-size:13px;color:var(--text2);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.on{background:var(--speed)}
+main{max-width:1080px;margin:0 auto;padding:20px 20px 110px}
+[hidden]{display:none!important}
+h1{font-size:28px;letter-spacing:-.02em;margin:6px 0 2px;outline:none}
+h2{font-size:18px;margin:28px 0 10px;letter-spacing:-.01em}
+h3{font-size:15px;margin:0 0 4px}
+p.sub,.note{color:var(--text2);margin:0}
+.note{font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin:12px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid2>.card{margin:0}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.between{justify-content:space-between}
+.btn,button.primary,button.ghost,button.danger{display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:999px;padding:9px 16px;font-weight:650;cursor:pointer;border:1px solid var(--line);background:var(--card)}
+button.primary{background:var(--btn);color:var(--btn-text);border-color:var(--btn)}
+button.danger{background:var(--danger);color:#fff;border-color:var(--danger)}
+.danger-text{color:var(--danger)!important}
+button.big{padding:14px 26px;font-size:17px}
+button:disabled{opacity:.45;cursor:default}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin:16px 0}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.tile .k{font-size:12px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.tile .v{font-size:24px;font-weight:750;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.tile .u{font-size:13px;color:var(--text2);font-weight:500;margin-left:3px}
+.chart{position:relative;width:100%;margin-top:8px;touch-action:pan-y}
+.chart canvas{display:block}
+.tip{position:absolute;pointer-events:none;background:var(--text);color:var(--bg);font-size:12px;padding:6px 9px;border-radius:8px;white-space:nowrap;opacity:0;transition:opacity .1s;z-index:5;font-variant-numeric:tabular-nums}
+.legend{display:flex;gap:14px;font-size:13px;color:var(--text2);margin-top:4px;flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.insights{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.ins{border-radius:12px;padding:14px 16px;border:1px solid var(--line)}
+.ins.focus{background:var(--warn-bg)} .ins.good{background:var(--good-bg)} .ins.info{background:var(--info-bg)}
+.ins .tag{font-size:11.5px;font-weight:750;text-transform:uppercase;letter-spacing:.06em}
+.ins.focus .tag{color:var(--warn)} .ins.good .tag{color:var(--good)} .ins.info .tag{color:var(--info)}
+.ins h4{margin:4px 0 4px;font-size:15.5px}
+.ins p{margin:0;color:var(--text2);font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+th{text-align:left;color:var(--text2);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:8px;border-bottom:1px solid var(--grid);white-space:nowrap}
+.scroll{overflow-x:auto}
+.lr{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;align-items:center;margin-top:10px}
+.lr .lab{font-size:13.5px;font-weight:600}
+.lr .lab small{display:block;color:var(--text2);font-weight:500;font-size:12px}
+.meter{position:relative;height:30px}
+.meter .axis{position:absolute;left:0;right:0;top:14px;height:2px;background:var(--grid)}
+.meter .mid{position:absolute;left:50%;top:6px;width:2px;height:18px;background:var(--muted);border-radius:1px}
+.meter .ok{position:absolute;top:10px;height:10px;background:var(--target);border-radius:4px}
+.meter .mk{position:absolute;top:7px;width:16px;height:16px;border-radius:50%;margin-left:-8px;border:2px solid var(--card)}
+.meter .ends{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);position:absolute;inset:auto 0 -12px 0}
+.zbar{display:flex;height:22px;border-radius:6px;overflow:hidden;gap:2px;margin:12px 0 10px}
+.zbar div{height:100%}
+.zl{display:grid;grid-template-columns:auto 1fr auto auto;gap:4px 10px;font-size:13.5px;align-items:center}
+.zl i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.list{display:grid;gap:10px}
+.sess{display:grid;grid-template-columns:1fr auto;gap:4px 14px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;cursor:pointer;text-align:left;width:100%}
+.sess:hover{border-color:var(--muted)}
+.sess .nm{font-weight:700;font-size:16px}
+.sess .meta{color:var(--text2);font-size:13.5px}
+.sess .st{display:flex;gap:16px;font-variant-numeric:tabular-nums;font-size:14px;grid-column:1/-1;color:var(--text2);flex-wrap:wrap}
+.sess .st b{color:var(--text)}
+.chip{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--info-bg);color:var(--text2);text-transform:uppercase;letter-spacing:.04em}
+.empty{text-align:center;padding:50px 20px}
+.empty h2{margin-top:0}
+/* live */
+.live-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
+.metric{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.metric .k{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text2)}
+.metric .v{font-size:34px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.1}
+.metric .u{font-size:13px;color:var(--text2)}
+.metric.hero{grid-column:span 2}
+.metric.hero .v{font-size:76px}
+.metric .tgt{font-size:14px;font-weight:700;margin-top:2px;min-height:20px}
+.tgt.lo{color:var(--warn)} .tgt.ok{color:var(--good)} .tgt.hi{color:var(--warn)}
+.bal{display:flex;height:16px;border-radius:6px;overflow:hidden;gap:2px;margin:8px 0 4px}
+.bal div{transition:width .3s}
+.opts{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;color:var(--text2);margin-top:6px}
+.opts label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.form{display:grid;grid-template-columns:200px 1fr;gap:12px 16px;align-items:center}
+.form input[type=number],.form input[type=text],.form select{padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);width:100%;max-width:220px}
+.zin{display:flex;gap:6px;flex-wrap:wrap}
+.zin input{width:70px!important}
+textarea{width:100%;min-height:70px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);resize:vertical}
+.rpe{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0}
+.rpe button{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--card);cursor:pointer;font-weight:700}
+.rpe button.on{background:var(--text);color:var(--bg)}
+details summary{cursor:pointer;font-weight:700}
+.warnbox{background:var(--warn-bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px}
+.parts td:last-child,.parts th:last-child{text-align:right}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:60;max-width:90vw}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+#modal .box{background:var(--card);border-radius:16px;padding:20px;max-width:420px;width:100%}
+.progress{height:8px;background:var(--grid);border-radius:4px;overflow:hidden;margin:10px 0}
+.progress div{height:100%;background:var(--rate);width:0}
+.wk{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:13.5px}
+.wk .b{height:14px;background:var(--rate);border-radius:0 4px 4px 0;min-width:2px}
+@media (max-width:760px){
+  header.top{padding:10px 14px}
+  nav#nav{position:fixed;bottom:0;left:0;right:0;margin:0;justify-content:space-around;background:var(--card);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+  nav#nav button{padding:8px 8px;font-size:13px}
+  main{padding:14px 14px 110px}
+  .grid2{grid-template-columns:1fr}
+  .metrics{grid-template-columns:repeat(2,1fr)}
+  .metric.hero .v{font-size:60px}
+  .metric .v{font-size:28px}
+  .form{grid-template-columns:1fr}
+  .lr{grid-template-columns:96px 1fr}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="14.5" width="26" height="3" rx="1.5" transform="rotate(-28 16 16)" fill="currentColor"/><ellipse cx="5.5" cy="22.5" rx="3.2" ry="6" transform="rotate(-28 5.5 22.5)" fill="var(--L)"/><ellipse cx="26.5" cy="9.5" rx="3.2" ry="6" transform="rotate(-28 26.5 9.5)" fill="var(--R)"/></svg>
+    Catch
+  </div>
+  <nav id="nav">
+    <button data-view="live">Paddle</button>
+    <button data-view="sessions">Sessions</button>
+    <button data-view="progress">Progress</button>
+    <button data-view="sensor">Sensor</button>
+    <button data-view="settings">Settings</button>
+  </nav>
+  <div class="pill" id="pill"><span class="dot" id="pillDot"></span><span id="pillText">No sensor</span></div>
+</header>
+
+<main>
+<!-- ================= LIVE ================= -->
+<section id="view-live" hidden>
+  <div class="live-head">
+    <div>
+      <h1 id="liveTitle">Ready to paddle</h1>
+      <p class="sub" id="liveSub">Connect your sensor, or try the simulator to see how it works.</p>
+    </div>
+    <div class="row">
+      <button class="primary big" id="btnStart">Start session</button>
+      <button class="danger big" id="btnStop" hidden>Finish</button>
+    </div>
+  </div>
+  <div class="opts" id="liveOpts">
+    <label><input type="checkbox" id="optSim"> Simulate a paddle (no sensor)</label>
+    <label><input type="checkbox" id="optGps" checked> Use phone GPS for speed</label>
+    <label><input type="checkbox" id="optVoice"> Voice updates every minute</label>
+  </div>
+  <div class="metrics">
+    <div class="metric hero"><div class="k">Stroke rate</div><div class="v" id="mRate">–</div><div class="u">strokes / min</div><div class="tgt" id="mTgt"></div></div>
+    <div class="metric hero"><div class="k">Split</div><div class="v" id="mSplit">–</div><div class="u">per 500 m</div><div class="tgt" id="mSpd"></div></div>
+    <div class="metric"><div class="k">Distance / stroke</div><div class="v" id="mDps">–</div><div class="u">metres</div></div>
+    <div class="metric"><div class="k">Time</div><div class="v" id="mTime">0:00</div><div class="u">elapsed</div></div>
+    <div class="metric"><div class="k">Distance</div><div class="v" id="mDist">–</div><div class="u">km</div></div>
+    <div class="metric"><div class="k">Strokes</div><div class="v" id="mN">0</div><div class="u">total</div></div>
+  </div>
+  <div class="card">
+    <div class="row between"><h3>Left / right timing</h3><span class="note num" id="balTxt">–</span></div>
+    <div class="bal"><div id="balL" style="width:50%;background:var(--L)"></div><div id="balR" style="width:50%;background:var(--R)"></div></div>
+    <div class="legend"><span><i style="background:var(--L)"></i>Left stroke share</span><span><i style="background:var(--R)"></i>Right stroke share</span><span>Even = 50 / 50 over the last 20 strokes</span></div>
+  </div>
+  <div class="card">
+    <h3>Stroke rate, last 2 minutes</h3>
+    <p class="note">Green band = your target rate (change it in Settings)</p>
+    <div class="chart" id="liveChart"></div>
+  </div>
+</section>
+
+<!-- ================= SESSIONS ================= -->
+<section id="view-sessions" hidden></section>
+<section id="view-session" hidden></section>
+<section id="view-progress" hidden></section>
+
+<!-- ================= SENSOR ================= -->
+<section id="view-sensor" hidden>
+  <h1>Sensor</h1>
+  <p class="sub">The sensor records every stroke to its own memory, so you don't need your phone on the water. Sync afterwards to pull sessions into the app.</p>
+  <div id="bleWarn"></div>
+  <div class="card">
+    <div class="row between">
+      <div><h3 id="sState">Not connected</h3><p class="note" id="sDetail">Give the paddle a shake to wake the sensor (two green blinks), then press Connect.</p></div>
+      <div class="row">
+        <button class="primary" id="btnConnect">Connect</button>
+        <button class="ghost" id="btnDisconnect" hidden>Disconnect</button>
+      </div>
+    </div>
+    <div class="tiles" id="sTiles" hidden></div>
+    <div class="row" id="sActions" hidden>
+      <button class="primary" id="btnSync">Sync sessions</button>
+      <button class="ghost danger-text" id="btnErase">Clear sensor memory</button>
+    </div>
+    <div id="syncProg" hidden><div class="progress"><div id="syncBar"></div></div><p class="note num" id="syncTxt"></p></div>
+  </div>
+  <div class="card">
+    <h3>Build your sensor (about £25)</h3>
+    <p class="note">Full instructions, wiring and firmware come with this app (HARDWARE.md and CatchSensor.ino).</p>
+    <div class="scroll"><table class="parts">
+      <thead><tr><th>Part</th><th>Why</th><th>Approx.</th></tr></thead>
+      <tbody>
+        <tr><td>Seeed XIAO nRF52840 <b>Sense</b></td><td>Thumbnail-sized board with Bluetooth, motion sensor (IMU), 2 MB memory and battery charger all built in</td><td>£15</td></tr>
+        <tr><td>3.7 V LiPo, 300–500 mAh (e.g. 502535)</td><td>Many hours of paddling per charge</td><td>£5</td></tr>
+        <tr><td>JST-PH 2-pin connector</td><td>So the battery unplugs for long storage. No power switch: it wakes when you pick up the paddle and sleeps after 10 min still</td><td>£0.50</td></tr>
+        <tr><td>3D-printed clamshell clamp (PETG)</td><td>Holds it to the shaft; PETG copes with water and sun better than PLA</td><td>£1</td></tr>
+        <tr><td>1.5 mm nitrile O-ring cord, 2× M3 stainless bolts + heat-set inserts, silica gel sachet</td><td>Watertight seal and closure</td><td>£3</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ================= SETTINGS ================= -->
+<section id="view-settings" hidden>
+  <h1>Settings</h1>
+  <div class="card">
+    <div class="form">
+      <label for="setName">Your name</label><input type="text" id="setName" placeholder="Optional">
+      <label for="setSwap">Swap left / right</label><div><label class="row"><input type="checkbox" id="setSwap"> <span class="note">Tick this if the app shows your strokes on the wrong side (depends which way the sensor faces).</span></label></div>
+      <label>Rate zone boundaries (spm)</label><div><div class="zin" id="setZones"></div><p class="note">Recovery | Endurance | Tempo | Threshold | Race. Counting every stroke, left and right.</p></div>
+      <label>Target rate band (live)</label><div class="zin"><input type="number" id="setTlo"> <span class="note">to</span> <input type="number" id="setThi"></div>
+      <label for="setUnits">Speed units</label><select id="setUnits"><option value="kmh">km/h</option><option value="mps">m/s</option></select>
+      <label for="setGap">New session after a break of</label><div class="zin"><input type="number" id="setGap" min="1" max="120"> <span class="note">minutes (used when syncing)</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Your data</h3>
+    <p class="note">Everything is stored on this device only.</p>
+    <div class="row" style="margin-top:10px">
+      <button class="ghost" id="btnBackup">Export backup (.json)</button>
+      <label class="btn ghost">Import backup<input type="file" id="inBackup" accept=".json,application/json" hidden></label>
+      <button class="ghost" id="btnDemoAdd">Add demo sessions</button>
+      <button class="ghost" id="btnDemoDel">Remove demo sessions</button>
+      <button class="ghost danger-text" id="btnWipe">Delete everything</button>
+    </div>
+  </div>
+</section>
+</main>
+
+<div id="modal"><div class="box" id="modalBox"></div></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Catch — paddle stroke analytics
+   Single-file app: Web Bluetooth sensor link, live mode, session analysis
+   ===================================================================== */
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sum = a => a.reduce((x, y) => x + y, 0);
+const mean = a => a.length ? sum(a) / a.length : NaN;
+const sd = a => { if (a.length < 2) return 0; const m = mean(a); return Math.sqrt(sum(a.map(x => (x - m) ** 2)) / (a.length - 1)); };
+const quantile = (a, q) => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y); const i = (s.length - 1) * q, lo = Math.floor(i), hi = Math.ceil(i); return s[lo] + (s[hi] - s[lo]) * (i - lo); };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.style.opacity = 1; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.opacity = 0, ms); }
+function confirmBox(title, body, okLabel = 'OK', danger = false) {
+  return new Promise(res => {
+    const m = $('#modal');
+    $('#modalBox').innerHTML = `<h3>${esc(title)}</h3><p class="note" style="margin:8px 0 16px">${body}</p><div class="row" style="justify-content:flex-end"><button class="ghost" id="mNo">Cancel</button><button class="${danger ? 'danger' : 'primary'}" id="mYes">${esc(okLabel)}</button></div>`;
+    m.style.display = 'flex';
+    const done = v => { m.style.display = 'none'; res(v); };
+    $('#mNo').onclick = () => done(false); $('#mYes').onclick = () => done(true);
+  });
+}
+
+/* ---------- formatting ---------- */
+const pad2 = n => String(n).padStart(2, '0');
+function fmtDur(ms) { if (!isFinite(ms)) return '–'; const s = Math.round(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return h ? `${h}:${pad2(m)}:${pad2(x)}` : `${m}:${pad2(x)}`; }
+function fmtSplit(mps) { if (!mps || !isFinite(mps) || mps < 0.3) return '–'; const s = 500 / mps; return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`; }
+function fmtSpeed(mps) { if (mps == null || !isFinite(mps)) return '–'; return settings.units === 'mps' ? mps.toFixed(2) : (mps * 3.6).toFixed(1); }
+const speedUnit = () => settings.units === 'mps' ? 'm/s' : 'km/h';
+function fmtDate(ms, withTime = true) { const d = new Date(ms); const o = { weekday: 'short', day: 'numeric', month: 'short' }; if (d.getFullYear() !== new Date().getFullYear()) o.year = 'numeric'; return d.toLocaleDateString('en-GB', o) + (withTime ? ' · ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''); }
+const pct = (x, d = 1) => (x > 0 ? '+' : '') + (x * 100).toFixed(d) + '%';
+
+/* ---------- settings ---------- */
+const DEFAULTS = { name: '', swap: false, zones: [60, 80, 95, 110], target: [100, 110], units: 'kmh', gapMin: 5 };
+const ZONE_NAMES = ['Recovery', 'Endurance', 'Tempo', 'Threshold', 'Race'];
+let settings = { ...DEFAULTS };
+let settingsVer = 0;
+try { const s = JSON.parse(localStorage.getItem('catch-settings') || 'null'); if (s) settings = { ...DEFAULTS, ...s }; } catch (e) { }
+function saveSettings() { settingsVer++; anCache.clear(); try { localStorage.setItem('catch-settings', JSON.stringify(settings)); } catch (e) { } }
+
+/* ---------- storage (IndexedDB, falls back to memory) ---------- */
+const Store = {
+  db: null,
+  async init() {
+    try {
+      this.db = await new Promise((res, rej) => {
+        const r = indexedDB.open('catch-paddle', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('sessions', { keyPath: 'id' });
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+      });
+    } catch (e) { this.db = null; }
+  },
+  req(mode, fn) { return new Promise((res, rej) => { const r = fn(this.db.transaction('sessions', mode).objectStore('sessions')); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
+  async all() { if (!this.db) return []; try { return await this.req('readonly', s => s.getAll()); } catch (e) { return []; } },
+  async put(x) { if (!this.db) return; try { await this.req('readwrite', s => s.put(x)); } catch (e) { toast('Could not save to this device’s storage'); } },
+  async del(id) { if (!this.db) return; try { await this.req('readwrite', s => s.delete(id)); } catch (e) { } },
+};
+let sessions = [];
+async function saveSession(s) { const i = sessions.findIndex(x => x.id === s.id); if (i >= 0) sessions[i] = s; else sessions.push(s); anCache.delete(s.id); await Store.put(s); }
+async function deleteSession(id) { sessions = sessions.filter(s => s.id !== id); anCache.delete(id); await Store.del(id); }
+
+/* Session shape:
+   { id, name, start, end, source:'sensor'|'live'|'demo', timeKnown, notes, rpe,
+     strokes: [[t, side(0=L,1=R), durMs, waterMs, peakGyro, maxTilt, intensity, key], ...],
+     gps:     [[t, speed m/s, lat, lon], ...] } */
+
+/* =====================================================================
+   ANALYSIS
+   ===================================================================== */
+const anCache = new Map();
+
+function smoothGps(g) {
+  if (!g || g.length < 5) return null;
+  const t = g.map(p => p[0]), v = g.map(p => p[1]);
+  const out = new Array(g.length); let lo = 0, hi = 0, acc = 0;
+  for (let i = 0; i < g.length; i++) {
+    while (hi < g.length && t[hi] <= t[i] + 3000) acc += v[hi++];
+    while (t[lo] < t[i] - 3000) acc -= v[lo++];
+    out[i] = acc / (hi - lo);
+  }
+  return { t, v: out };
+}
+function speedAt(G, t) {
+  if (!G) return null; const T = G.t;
+  if (t < T[0] - 5000 || t > T[T.length - 1] + 5000) return null;
+  let lo = 0, hi = T.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (T[m] <= t) lo = m; else hi = m; }
+  if (T[hi] === T[lo]) return G.v[lo];
+  const f = clamp((t - T[lo]) / (T[hi] - T[lo]), 0, 1);
+  return G.v[lo] + (G.v[hi] - G.v[lo]) * f;
+}
+function zoneOf(rate) { const z = settings.zones; let i = 0; while (i < z.length && rate >= z[i]) i++; return i; }
+
+function blockStats(arr, hasGps) {
+  const n = arr.length, sumDur = sum(arr.map(s => s.dur));
+  const time = arr[n - 1].t + arr[n - 1].dur - arr[0].t;
+  const rate = 60000 * n / sumDur;
+  let dist = null, speed = null, dps = null;
+  if (hasGps) {
+    const w = arr.filter(s => s.spd != null);
+    if (w.length > n * 0.7) { dist = sum(w.map(s => s.spd * s.dur / 1000)) * n / w.length; speed = dist / (sumDur / 1000); dps = dist / n; }
+  }
+  const cyc = []; for (let i = 0; i + 1 < n; i += 2) cyc.push(120000 / (arr[i].dur + arr[i + 1].dur));
+  const cv = cyc.length > 3 ? sd(cyc) / mean(cyc) : null;
+  const side = k => { const a = arr.filter(s => s.side === k); return { n: a.length, dur: mean(a.map(s => s.dur)), water: mean(a.map(s => s.water / s.dur)) * 100, tilt: mean(a.map(s => s.tilt)), gyro: mean(a.map(s => s.gyro)), inten: mean(a.map(s => s.inten)) }; };
+  const third = Math.floor(n / 3);
+  const seg = a => { const sd_ = sum(a.map(s => s.dur)); const w = a.filter(s => s.spd != null); return { rate: 60000 * a.length / sd_, dps: hasGps && w.length ? sum(w.map(s => s.spd * s.dur / 1000)) / w.length : null, inten: mean(a.map(s => s.inten)) }; };
+  let fade = null;
+  if (third >= 6) { const a = seg(arr.slice(0, third)), c = seg(arr.slice(n - third)); fade = { rate: c.rate / a.rate - 1, dps: a.dps && c.dps ? c.dps / a.dps - 1 : null, inten: c.inten / a.inten - 1 }; }
+  const openRate = n > 20 ? 60000 * 10 / sum(arr.slice(0, 10).map(s => s.dur)) : null;
+  return { n, time, rate, dist, speed, dps, cv, L: side(0), R: side(1), fade, openRate, t0: arr[0].t, t1: arr[n - 1].t + arr[n - 1].dur };
+}
+
+function analyze(s) {
+  const key = settingsVer + '|' + (s.gps ? s.gps.length : 0) + '|' + s.strokes.length + '|' + (s.gpsShift || 0);
+  const c = anCache.get(s.id); if (c && c.key === key) return c.A;
+  const st = s.strokes.map(a => ({ t: a[0], side: settings.swap ? 1 - a[1] : a[1], dur: a[2], water: a[3], gyro: a[4], tilt: a[5], inten: a[6], rate: 60000 / a[2] })).sort((a, b) => a.t - b.t);
+  const n = st.length;
+  // smoothed rate (6-stroke centred) and 20 s rolling rate
+  for (let i = 0; i < n; i++) { const lo = Math.max(0, i - 3), hi = Math.min(n, i + 3); let d = 0; for (let j = lo; j < hi; j++) d += st[j].dur; st[i].sm = 60000 * (hi - lo) / d; }
+  { let lo = 0, hi = 0, d = 0; for (let i = 0; i < n; i++) { while (hi < n && st[hi].t <= st[i].t + 10000) d += st[hi++].dur; while (st[lo].t < st[i].t - 10000) d -= st[lo++].dur; st[i].r20 = 60000 * (hi - lo) / d; } }
+  // speed per stroke
+  const G = smoothGps(s.gps);
+  let covered = 0;
+  for (const x of st) { x.spd = speedAt(G, x.t + x.dur / 2); if (x.spd != null) { covered++; x.dps = x.spd * x.dur / 1000; } }
+  const hasGps = covered > n * 0.5;
+  // efforts (pieces) detection
+  const base = quantile(st.map(x => x.r20), 0.35);
+  const thr = base + Math.max(10, base * 0.12);
+  let raw = []; let cur = null;
+  for (let i = 0; i < n; i++) {
+    if (st[i].r20 > thr) { if (!cur) cur = { a: i, b: i }; else cur.b = i; }
+    else if (cur) { raw.push(cur); cur = null; }
+  }
+  if (cur) raw.push(cur);
+  const merged = [];
+  for (const p of raw) { const last = merged[merged.length - 1]; if (last && st[p.a].t - (st[last.b].t + st[last.b].dur) < 15000) last.b = p.b; else merged.push({ ...p }); }
+  // trim the rolling-window smear at edges: start/end where the 6-stroke rate crosses threshold-4
+  for (const p of merged) {
+    while (p.a < p.b && st[p.a].sm < thr - 4) p.a++;
+    while (p.b > p.a && st[p.b].sm < thr - 4) p.b--;
+  }
+  const pieces = merged.filter(p => st[p.b].t + st[p.b].dur - st[p.a].t >= 30000 && p.b - p.a > 20).map((p, k) => ({ idx: k + 1, a: p.a, b: p.b, ...blockStats(st.slice(p.a, p.b + 1), hasGps) }));
+  // whole session
+  const whole = blockStats(st, hasGps);
+  let workStrokes = pieces.length ? pieces.flatMap(p => st.slice(p.a, p.b + 1)) : st;
+  const work = blockStats(workStrokes, hasGps);
+  // zones (time by 6-stroke smoothed rate, only counting strokes while paddling)
+  const zones = [0, 0, 0, 0, 0]; for (const x of st) zones[zoneOf(x.sm)] += x.dur;
+  // efficiency bins
+  const bins = [];
+  if (hasGps) for (let i = 0; i + 12 <= n; i += 12) {
+    const b = st.slice(i, i + 12); if (b.some(x => x.spd == null)) continue;
+    const d = sum(b.map(x => x.dur)); const dist = sum(b.map(x => x.spd * x.dur / 1000));
+    bins.push({ t: b[0].t, rate: 60000 * 12 / d, dps: dist / 12, speed: dist / (d / 1000) });
+  }
+  let fit = null;
+  if (bins.length > 8) {
+    const xs = bins.map(b => b.rate), ys = bins.map(b => b.dps); const mx = mean(xs), my = mean(ys);
+    const sxx = sum(xs.map(x => (x - mx) ** 2)); const span = quantile(xs, .95) - quantile(xs, .05);
+    if (sxx > 0 && span >= 15) { const b = sum(xs.map((x, i) => (x - mx) * (ys[i] - my))) / sxx; fit = { a: my - b * mx, b, lo: quantile(xs, .03), hi: quantile(xs, .97) }; }
+  }
+  const dpsAt = r => { const near = bins.filter(b => Math.abs(b.rate - r) <= 6); if (near.length >= 3) return mean(near.map(b => b.dps)); if (fit && r >= fit.lo && r <= fit.hi) return fit.a + fit.b * r; return null; };
+  const A = { st, n, hasGps, pieces, whole, work, zones, bins, fit, dpsAt, t0: st[0]?.t, t1: st[n - 1] ? st[n - 1].t + st[n - 1].dur : 0 };
+  A.insights = buildInsights(A);
+  anCache.set(s.id, { key, A });
+  return A;
+}
+
+function buildInsights(A) {
+  const out = []; const W = A.work; const where = A.pieces.length ? 'during your efforts' : 'across the session';
+  // 1. timing balance
+  const md = (W.L.dur + W.R.dur) / 2, dDur = (W.R.dur - W.L.dur) / md;
+  if (Math.abs(dDur) >= 0.03) {
+    const quick = dDur < 0 ? 'right' : 'left', slow = dDur < 0 ? 'left' : 'right';
+    out.push({ k: 'focus', h: `Your ${quick} stroke is ${Math.abs(dDur * 100).toFixed(1)}% quicker than your ${slow}`, p: `${where[0].toUpperCase() + where.slice(1)}: ${Math.round(W.L.dur)} ms left vs ${Math.round(W.R.dur)} ms right. A rushed stroke on one side often comes from less rotation or an early exit on that side. Try a few minutes counting “left… right…” out loud and matching them, and check your rotation on the ${quick}.` });
+  } else out.push({ k: 'good', h: 'Even left/right timing', p: `Your strokes take the same time on each side ${where} (${Math.abs(dDur * 100).toFixed(1)}% difference). That's a balanced boat.` });
+  // 2. intensity balance
+  const mi = (W.L.inten + W.R.inten) / 2, dI = (W.L.inten - W.R.inten) / mi;
+  if (Math.abs(dI) >= 0.06) out.push({ k: 'focus', h: `Your ${dI > 0 ? 'left' : 'right'} side pulls harder (${Math.abs(dI * 100).toFixed(0)}% more intensity)`, p: `Intensity comes from how hard the paddle accelerates, so read it as a sign of effort rather than a force measurement. Uneven pull tends to make the boat yaw, which you then correct with steering strokes, and that costs speed.` });
+  // 3. fade
+  const fadeP = A.pieces.filter(p => p.fade);
+  if (fadeP.length) {
+    const fd = fadeP.filter(p => p.fade.dps != null);
+    if (fd.length) {
+      const dps = mean(fd.map(p => p.fade.dps)), rate = mean(fd.map(p => p.fade.rate));
+      if (dps <= -0.04) out.push({ k: 'focus', h: `You lose ${Math.abs(dps * 100).toFixed(0)}% distance per stroke by the end of each effort`, p: rate > 0.01 ? `Your rate climbs ${pct(rate, 0)} over the same stretch, so you're spinning faster to hold speed while each stroke gets shorter. Practise keeping your catch long in the last third of pieces.` : `Your rate holds steady, so the speed you lose comes from shorter, weaker strokes as you tire. Strength-endurance work and staying long at the front of the stroke will help.` });
+      else if (dps > -0.02) out.push({ k: 'good', h: 'You held your stroke length through the efforts', p: `Distance per stroke changed by only ${pct(dps)} from the first third to the last third of your efforts, so your technique holds up under fatigue.` });
+    } else {
+      const it = mean(fadeP.map(p => p.fade.inten));
+      if (it <= -0.06) out.push({ k: 'focus', h: `Pull intensity drops ${Math.abs(it * 100).toFixed(0)}% late in efforts`, p: 'Add GPS (phone, or a .gpx from your watch) to see whether that costs you distance per stroke.' });
+    }
+  }
+  // 4. rhythm consistency
+  const cvs = (A.pieces.length ? A.pieces : [A.whole]).map(p => p.cv).filter(v => v != null);
+  if (cvs.length) {
+    const cv = quantile(cvs, .5);
+    if (cv < 0.035) out.push({ k: 'good', h: 'Smooth, consistent rhythm', p: `Your stroke rhythm varied by only ±${(cv * 100).toFixed(1)}% ${where}. Steady rhythm keeps the boat running between strokes.` });
+    else if (cv > 0.06) out.push({ k: 'focus', h: 'Uneven rhythm', p: `Your stroke rhythm varied by ±${(cv * 100).toFixed(1)}% ${where}. Some of that is surges and steering, but a smoother rhythm usually means a faster boat for the same effort. Try paddling to a metronome at your target rate.` });
+  }
+  // 5. fast starts
+  const opens = A.pieces.filter(p => p.openRate);
+  if (opens.length >= 2) {
+    const o = mean(opens.map(p => p.openRate / p.rate - 1));
+    if (o > 0.08) out.push({ k: 'info', h: `You start efforts ${Math.round(o * 100)}% above your average rate`, p: `Your first 10 strokes averaged ${Math.round(mean(opens.map(p => p.openRate)))} spm. A fast start is good for racing, but in training pieces it can cost you later in the effort.` });
+  }
+  // 6. efficiency curve
+  if (A.fit) {
+    const lost = -A.fit.b * 10;
+    out.push({ k: 'info', h: `Each +10 spm cost you ${lost.toFixed(2)} m per stroke`, p: `At ${Math.round(A.fit.lo + 5)} spm you covered ${(A.fit.a + A.fit.b * (A.fit.lo + 5)).toFixed(2)} m per stroke; at ${Math.round(A.fit.hi - 3)} spm, ${(A.fit.a + A.fit.b * (A.fit.hi - 3)).toFixed(2)} m. If this line gets flatter on the Progress tab, you're keeping your stroke length as the rate rises.` });
+  }
+  // 7. best effort
+  const sp = A.pieces.filter(p => p.speed);
+  if (sp.length >= 2) { const b = sp.reduce((x, y) => y.speed > x.speed ? y : x); out.push({ k: 'good', h: `Best effort: #${b.idx}, ${fmtSplit(b.speed)} /500 m`, p: `${fmtDur(b.time)} at ${Math.round(b.rate)} spm and ${b.dps.toFixed(2)} m per stroke.` }); }
+  if (!A.hasGps) out.push({ k: 'info', h: 'Add speed to unlock more insights', p: 'With GPS (phone in live mode, or a .gpx file from your watch) Catch can work out distance per stroke, splits and your efficiency curve.' });
+  const order = { focus: 0, good: 1, info: 2 };
+  return out.sort((a, b) => order[a.k] - order[b.k]).slice(0, 6);
+}
+
+/* =====================================================================
+   CHARTS (canvas, hover tooltips)
+   ===================================================================== */
+function niceTicks(min, max, count = 4) {
+  const span = max - min || 1; const step0 = span / count; const mag = 10 ** Math.floor(Math.log10(step0)); const e = step0 / mag;
+  const step = (e >= 7.5 ? 10 : e >= 3.5 ? 5 : e >= 1.5 ? 2 : 1) * mag; const out = [];
+  for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) out.push(+v.toFixed(10)); return out;
+}
+/* o = { series:[{xs, ys, color:'--var', type:'line'|'dot', width}], height, xFmt, yFmt, yMin, yMax, xMin, xMax,
+         bands:[[x0,x1]], hband:[y0,y1], zeroLine, tip:(si,i)=>html, nearest:bool } */
+function plot(el, o) {
+  el.innerHTML = ''; el.style.position = 'relative';
+  const c = document.createElement('canvas'); const tip = document.createElement('div'); tip.className = 'tip';
+  el.append(c, tip);
+  const H = o.height || 220; let geom = null;
+  function draw(hover) {
+    const W = el.clientWidth || 600, dpr = window.devicePixelRatio || 1;
+    c.width = W * dpr; c.height = H * dpr; c.style.width = W + 'px'; c.style.height = H + 'px';
+    const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+    ctx.font = '11px system-ui, sans-serif';
+    const allX = o.series.flatMap(s => s.xs), allY = o.series.flatMap(s => s.ys).filter(v => v != null && isFinite(v));
+    if (!allX.length || !allY.length) { ctx.fillStyle = css('--muted'); ctx.fillText('No data yet', 10, H / 2); geom = null; return; }
+    let x0 = o.xMin ?? Math.min(...allX), x1 = o.xMax ?? Math.max(...allX); if (x1 === x0) { x0 -= 1; x1 += 1; }
+    let y0 = o.yMin ?? Math.min(...allY), y1 = o.yMax ?? Math.max(...allY);
+    if (o.hband) { y0 = Math.min(y0, o.hband[0]); y1 = Math.max(y1, o.hband[1]); }
+    if (o.zeroLine) { y0 = Math.min(y0, 0); y1 = Math.max(y1, 0); }
+    const padY = (y1 - y0 || 1) * 0.08; if (o.yMin == null) y0 -= padY; if (o.yMax == null) y1 += padY;
+    const yt = niceTicks(y0, y1, 4);
+    const ylab = yt.map(v => (o.yFmt || String)(v));
+    const pl = Math.max(30, ...ylab.map(s => ctx.measureText(s).width + 10)), pr = 12, pt = 10, pb = 24;
+    const X = v => pl + (v - x0) / (x1 - x0) * (W - pl - pr), Y = v => pt + (1 - (v - y0) / (y1 - y0)) * (H - pt - pb);
+    geom = { X, Y, pl, pr, W, x0, x1 };
+    // bands
+    if (o.bands) { ctx.fillStyle = css('--band'); for (const [a, b] of o.bands) ctx.fillRect(X(a), pt, Math.max(1, X(b) - X(a)), H - pt - pb); }
+    if (o.hband) { ctx.fillStyle = css('--target'); ctx.fillRect(pl, Y(o.hband[1]), W - pl - pr, Y(o.hband[0]) - Y(o.hband[1])); }
+    // grid + y labels
+    ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1; ctx.fillStyle = css('--muted'); ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    yt.forEach((v, i) => { const y = Math.round(Y(v)) + .5; ctx.beginPath(); ctx.moveTo(pl, y); ctx.lineTo(W - pr, y); ctx.stroke(); ctx.fillText(ylab[i], pl - 6, y); });
+    if (o.zeroLine) { ctx.strokeStyle = css('--muted'); ctx.beginPath(); ctx.moveTo(pl, Y(0)); ctx.lineTo(W - pr, Y(0)); ctx.stroke(); }
+    // x labels
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = css('--muted');
+    const xt = o.xTicks ? o.xTicks(x0, x1) : niceTicks(x0, x1, Math.max(2, Math.floor((W - pl) / 90)));
+    for (const v of xt) if (v >= x0 && v <= x1) { const lab = (o.xFmt || String)(v), w = ctx.measureText(lab).width, px = X(v); ctx.textAlign = px + w / 2 > W - 2 ? 'right' : px - w / 2 < 2 ? 'left' : 'center'; ctx.fillText(lab, ctx.textAlign === 'right' ? W - 2 : ctx.textAlign === 'left' ? 2 : px, H - pb + 6); }
+    // series
+    o.series.forEach((s, si) => {
+      const col = css(s.color);
+      if (s.type === 'dot') {
+        for (let i = 0; i < s.xs.length; i++) { if (s.ys[i] == null) continue; ctx.beginPath(); ctx.arc(X(s.xs[i]), Y(s.ys[i]), s.r || 4, 0, 7); ctx.fillStyle = col; ctx.globalAlpha = s.alpha ?? .75; ctx.fill(); ctx.globalAlpha = 1; }
+      } else {
+        ctx.strokeStyle = col; ctx.lineWidth = s.width || 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; if (s.dash) ctx.setLineDash(s.dash);
+        ctx.beginPath(); let pen = false;
+        for (let i = 0; i < s.xs.length; i++) { const y = s.ys[i]; if (y == null || !isFinite(y) || (s.gapAfter && i && s.xs[i] - s.xs[i - 1] > s.gapAfter)) { if (y == null || !isFinite(y)) { pen = false; continue; } pen = false; } const px = X(s.xs[i]), py = Y(y); if (pen) ctx.lineTo(px, py); else { ctx.moveTo(px, py); pen = true; } }
+        ctx.stroke(); ctx.setLineDash([]);
+        if (s.markers) for (let i = 0; i < s.xs.length; i++) { if (s.ys[i] == null) continue; ctx.beginPath(); ctx.arc(X(s.xs[i]), Y(s.ys[i]), 4.5, 0, 7); ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = css('--card'); ctx.stroke(); }
+      }
+    });
+    // hover
+    if (hover) {
+      const { si, i } = hover; const s = o.series[si];
+      const px = X(s.xs[i]), py = Y(s.ys[i]);
+      if (!o.nearest) { ctx.strokeStyle = css('--muted'); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px, pt); ctx.lineTo(px, H - pb); ctx.stroke(); }
+      ctx.beginPath(); ctx.arc(px, py, 5, 0, 7); ctx.fillStyle = css(s.color); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = css('--card'); ctx.stroke();
+      tip.innerHTML = o.tip ? o.tip(si, i) : `${(o.yFmt || String)(s.ys[i])}`;
+      tip.style.opacity = 1;
+      const tw = tip.offsetWidth; let left = px + 12; if (left + tw > W) left = px - tw - 12;
+      tip.style.left = left + 'px'; tip.style.top = Math.max(0, Math.min(H - 40, py - 34)) + 'px';
+    } else tip.style.opacity = 0;
+  }
+  function pick(ev) {
+    if (!geom) return null; const r = c.getBoundingClientRect(); const p = ev.touches ? ev.touches[0] : ev; const mx = p.clientX - r.left, my = p.clientY - r.top;
+    if (mx < geom.pl - 5 || mx > geom.W - geom.pr + 5) return null;
+    if (o.nearest) {
+      let best = null, bd = 900;
+      o.series.forEach((s, si) => { if (s.noHover) return; for (let i = 0; i < s.xs.length; i++) { if (s.ys[i] == null) continue; const d = (geom.X(s.xs[i]) - mx) ** 2 + (geom.Y(s.ys[i]) - my) ** 2; if (d < bd) { bd = d; best = { si, i }; } } });
+      return best;
+    }
+    const si = o.hoverSeries || 0; const xs = o.series[si].xs; if (!xs.length) return null;
+    const xv = geom.x0 + (mx - geom.pl) / (geom.W - geom.pl - geom.pr) * (geom.x1 - geom.x0);
+    let lo = 0, hi = xs.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] <= xv) lo = m; else hi = m; }
+    let i = Math.abs(xs[hi] - xv) < Math.abs(xs[lo] - xv) ? hi : lo;
+    const ys = o.series[si].ys; let j = i; while (j > 0 && ys[j] == null) j--; return ys[j] == null ? null : { si, i: j };
+  }
+  c.addEventListener('mousemove', e => draw(pick(e)));
+  c.addEventListener('mouseleave', () => draw(null));
+  c.addEventListener('touchstart', e => draw(pick(e)), { passive: true });
+  c.addEventListener('touchmove', e => draw(pick(e)), { passive: true });
+  c.addEventListener('touchend', () => setTimeout(() => draw(null), 1500));
+  const ro = new ResizeObserver(() => draw(null)); ro.observe(el);
+  draw(null);
+  return { draw };
+}
+const minFmt = v => `${Math.round(v)} min`;
+const elapsedFmt = m => fmtDur(m * 60000);
+
+/* =====================================================================
+   SIMULATED PADDLER (demo sessions + live simulator)
+   ===================================================================== */
+function rng(seed) { let a = seed >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gauss(r) { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function makePaddler(seed, P) {
+  const r = rng(seed); P = { fitness: 1, asymDur: 0.04, asymInt: 0.08, asymWater: 0.05, fade: 0.07, ...P };
+  return {
+    r, P,
+    stroke(side, rate, fat) {
+      const sg = side === 1 ? -1 : 1;
+      const dur = 60000 / rate * (1 + sg * P.asymDur / 2) * (1 + gauss(r) * 0.022 * (1 + fat));
+      const ws = Math.min(0.8, 0.56 + (rate - 60) * 0.0018) * (1 + sg * P.asymWater / 2);
+      return { dur, water: dur * ws * (1 + gauss(r) * 0.03), tilt: 44 + (rate - 60) * 0.18 + gauss(r) * 3 - fat * 3, gyro: 90 + rate * 1.6 + gauss(r) * 14, inten: Math.max(5, (25 + (rate - 50) * 1.15) * (1 + sg * P.asymInt / 2) * (1 - fat * 0.06) + gauss(r) * 4) };
+    },
+    dps(rate, fat) { return (2.80 - (rate - 70) * 0.0095) * P.fitness * (1 - fat * P.fade); },
+  };
+}
+const PLANS = {
+  intervals: { name: '6 × 3 min at race pace', segs: [[600, 72], ...Array.from({ length: 6 }, () => [[180, 112, 1], [90, 54]]).flat(), [480, 66]] },
+  steady: { name: 'Steady 45 min endurance', segs: [[300, 66], [2700, 80], [300, 62]] },
+  pyramid: { name: 'Pyramid 1-2-3-2-1 min', segs: [[540, 72], [60, 118, 1], [60, 52], [120, 112, 1], [90, 52], [180, 106, 1], [120, 52], [120, 112, 1], [90, 52], [60, 118, 1], [420, 64]] },
+  threshold: { name: '3 × 8 min threshold', segs: [[600, 72], [480, 100, 1], [180, 56], [480, 100, 1], [180, 56], [480, 100, 1], [420, 64]] },
+};
+function simulateSession(planKey, seed, start, P) {
+  const pad = makePaddler(seed, P), r = pad.r, plan = PLANS[planKey];
+  let t = start, side = 0, rate = plan.segs[0][1]; const strokes = [], sp = [];
+  for (const [secs, tgt, hard] of plan.segs) {
+    const s0 = t;
+    while (t - s0 < secs * 1000) {
+      const prog = (t - s0) / (secs * 1000), fat = hard ? prog : 0;
+      rate += ((tgt + (hard ? prog * 3 : 0) + gauss(r) * 1.3) - rate) * 0.3;
+      const k = pad.stroke(side, rate, fat);
+      strokes.push([Math.round(t), side, Math.round(k.dur), Math.round(k.water), Math.round(k.gyro), Math.round(k.tilt), Math.round(k.inten), null]);
+      sp.push([t, t + k.dur, pad.dps(rate, fat) * 1000 / k.dur]);
+      t += k.dur; side ^= 1;
+    }
+  }
+  // GPS at 1 Hz: boat speed with inertia + noise, position along a gently winding course
+  const gps = []; let v = sp[0][2], j = 0, lat = 53.3811, lon = -1.4701, hd = r() * 6.28;
+  for (let g = start; g < t; g += 1000) {
+    while (j < sp.length - 1 && sp[j][1] < g) j++;
+    v += (sp[j][2] - v) * 0.35;
+    const meas = Math.max(0, v + gauss(r) * 0.07);
+    hd += gauss(r) * 0.03; lat += Math.cos(hd) * v / 111320; lon += Math.sin(hd) * v / (111320 * Math.cos(lat * Math.PI / 180));
+    gps.push([g, +meas.toFixed(3), +lat.toFixed(6), +lon.toFixed(6)]);
+  }
+  return { strokes, gps, end: t };
+}
+async function addDemoSessions() {
+  const now = new Date(); const day = 86400000;
+  const list = [['steady', 26, .96, .055, .10], ['intervals', 22, .97, .05, .09], ['threshold', 17, .98, .045, .085], ['pyramid', 12, .99, .04, .08], ['steady', 8, 1.0, .035, .07], ['intervals', 3, 1.015, .03, .065]];
+  let k = 0;
+  for (const [plan, ago, fit, ad, ai] of list) {
+    const d = new Date(now.getTime() - ago * day); d.setHours(17, 40, 0, 0);
+    const sim = simulateSession(plan, 1000 + k, d.getTime(), { fitness: fit, asymDur: ad, asymInt: ai, fade: 0.08 - k * 0.008 });
+    await saveSession({ id: 'demo-' + k, name: PLANS[plan].name, start: sim.strokes[0][0], end: sim.end, source: 'demo', timeKnown: true, notes: '', rpe: null, strokes: sim.strokes, gps: sim.gps });
+    k++;
+  }
+  toast('Added 6 demo sessions from the last month');
+}
+
+/* =====================================================================
+   BLUETOOTH SENSOR
+   ===================================================================== */
+const U = x => `7e1a00${x}-5a4b-4c3d-9e2f-1b0c0d0e0f10`;
+const UUIDS = { svc: U('01'), live: U('02'), data: U('03'), ctrl: U('04'), status: U('05') };
+const REC = { STROKE: 1, BOOT: 2, TIMESYNC: 3, END: 0xEE };
+function parseRec(dv, o) {
+  const type = dv.getUint8(o);
+  const r = { type, side: dv.getUint8(o + 1), bootId: dv.getUint16(o + 2, true), tMs: dv.getUint32(o + 4, true), dur: dv.getUint16(o + 8, true), water: dv.getUint16(o + 10, true), gyro: dv.getInt16(o + 12, true), tilt: dv.getUint8(o + 14), inten: dv.getUint8(o + 15) };
+  if (type === REC.TIMESYNC) r.epoch = dv.getUint32(o + 8, true);
+  return r;
+}
+const BLE = {
+  dev: null, ch: {}, status: null, statusAt: 0, connected: false, dump: null, liveHandler: null,
+  supported: !!(navigator.bluetooth && navigator.bluetooth.requestDevice),
+  async connect() {
+    this.dev = await navigator.bluetooth.requestDevice({ filters: [{ services: [UUIDS.svc] }, { namePrefix: 'CatchSensor' }], optionalServices: [UUIDS.svc] });
+    this.dev.addEventListener('gattserverdisconnected', () => { this.connected = false; if (this.dump) this.dump.fail(new Error('Sensor disconnected')); renderSensor(); updatePill(); });
+    const server = await this.dev.gatt.connect();
+    const svc = await server.getPrimaryService(UUIDS.svc);
+    for (const k of ['live', 'data', 'ctrl', 'status']) this.ch[k] = await svc.getCharacteristic(UUIDS[k]);
+    this.ch.live.addEventListener('characteristicvaluechanged', e => { const r = parseRec(e.target.value, 0); if (r.type === REC.STROKE && this.liveHandler) this.liveHandler(r); });
+    await this.ch.live.startNotifications();
+    this.ch.data.addEventListener('characteristicvaluechanged', e => this.onData(e.target.value));
+    await this.ch.data.startNotifications();
+    this.ch.status.addEventListener('characteristicvaluechanged', e => this.setStatus(e.target.value));
+    try { await this.ch.status.startNotifications(); } catch (e) { }
+    // tell the sensor what time it is, so its log has real timestamps
+    const b = new Uint8Array(5); b[0] = 'T'.charCodeAt(0); new DataView(b.buffer).setUint32(1, Math.floor(Date.now() / 1000), true);
+    await this.ch.ctrl.writeValue(b);
+    await this.readStatus();
+    this.connected = true;
+  },
+  setStatus(dv) { this.status = { records: dv.getUint32(0, true), bootId: dv.getUint16(4, true), millis: dv.getUint32(6, true), mv: dv.getUint16(10, true), flashOk: !!dv.getUint8(12), fw: dv.getUint8(13) }; this.statusAt = Date.now(); if (curView === 'sensor') renderSensor(); },
+  async readStatus() { this.setStatus(await this.ch.status.readValue()); },
+  bootOffset() { return this.status ? this.statusAt - this.status.millis : null; },
+  disconnect() { try { this.dev?.gatt?.disconnect(); } catch (e) { } this.connected = false; },
+  onData(dv) {
+    if (!this.dump) return;
+    for (let o = 0; o + 16 <= dv.byteLength; o += 16) {
+      const r = parseRec(dv, o);
+      if (r.type === REC.END) { const d = this.dump; this.dump = null; clearTimeout(d.timer); d.done(d.recs); return; }
+      this.dump.recs.push(r);
+    }
+    this.dump.progress(this.dump.recs.length); this.dump.kick();
+  },
+  download(progress) {
+    return new Promise(async (done, fail) => {
+      const d = { recs: [], done, fail: e => { this.dump = null; fail(e); }, progress, timer: null };
+      d.kick = () => { clearTimeout(d.timer); d.timer = setTimeout(() => d.fail(new Error('Sensor stopped responding')), 8000); };
+      this.dump = d; d.kick();
+      try { await this.ch.ctrl.writeValue(new Uint8Array(['D'.charCodeAt(0)])); } catch (e) { d.fail(e); }
+    });
+  },
+  async erase() { await this.ch.ctrl.writeValue(new TextEncoder().encode('ERAS')); setTimeout(() => this.readStatus().catch(() => { }), 4000); },
+};
+
+function existingKeys() { const k = new Set(); for (const s of sessions) for (const x of s.strokes) if (x[7] != null) k.add(x[7]); return k; }
+function recordsToSessions(recs) {
+  const off = {};
+  for (const r of recs) if (r.type === REC.TIMESYNC) off[r.bootId] = r.epoch * 1000 - r.tMs;
+  if (BLE.status && off[BLE.status.bootId] == null) off[BLE.status.bootId] = BLE.bootOffset();
+  const keys = existingKeys(); const gap = settings.gapMin * 60000;
+  const groups = []; let cur = null, prev = null;
+  for (const r of recs) {
+    if (r.type !== REC.STROKE) continue;
+    if (!cur || r.bootId !== prev.bootId || r.tMs - prev.tMs > gap || r.tMs < prev.tMs) { cur = { known: off[r.bootId] != null, strokes: [] }; groups.push(cur); }
+    prev = r;
+    const key = r.bootId * 4294967296 + r.tMs; if (keys.has(key)) continue;
+    const t = cur.known ? off[r.bootId] + r.tMs : Date.now() - 86400000 + r.tMs;
+    cur.strokes.push([t, r.side, r.dur, r.water, r.gyro, r.tilt, r.inten, key]);
+  }
+  return groups.filter(g => g.strokes.length >= 30).map(g => {
+    const st = g.strokes, start = st[0][0], end = st[st.length - 1][0] + st[st.length - 1][2];
+    const h = new Date(start).getHours();
+    return { id: uid(), name: `${h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening'} paddle`, start, end, source: 'sensor', timeKnown: g.known, notes: '', rpe: null, strokes: st, gps: [] };
+  });
+}
+
+/* =====================================================================
+   LIVE SESSION
+   ===================================================================== */
+const Live = { on: false, src: null, start: 0, strokes: [], gps: [], watch: null, tick: null, sim: null, wake: null, lastVoice: 0 };
+function liveSpeed() { const now = Date.now(); const g = Live.gps.filter(p => p[0] > now - 5000); return g.length ? mean(g.map(p => p[1])) : null; }
+function liveDistance() { let d = 0; for (let i = 1; i < Live.gps.length; i++) { const dt = (Live.gps[i][0] - Live.gps[i - 1][0]) / 1000; if (dt < 10) d += Live.gps[i][1] * dt; } return d; }
+function addLiveStroke(a) { Live.strokes.push(a); updateLive(); }
+function onGps(pos) {
+  const c = pos.coords, t = pos.timestamp || Date.now(); let v = c.speed;
+  const last = Live.gps[Live.gps.length - 1];
+  if ((v == null || isNaN(v)) && last) { const dt = (t - last[0]) / 1000; if (dt > 0) v = haversine(last[2], last[3], c.latitude, c.longitude) / dt; }
+  if (v == null || isNaN(v)) v = 0;
+  if (c.accuracy && c.accuracy > 40) return; // ignore poor fixes
+  Live.gps.push([t, +v.toFixed(3), c.latitude, c.longitude]);
+}
+function haversine(a1, o1, a2, o2) { const R = 6371000, r = Math.PI / 180; const da = (a2 - a1) * r, dO = (o2 - o1) * r; const h = Math.sin(da / 2) ** 2 + Math.cos(a1 * r) * Math.cos(a2 * r) * Math.sin(dO / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); }
+
+function startSim() {
+  // free-paddle: alternating 90 s steady / 40 s hard / 50 s easy
+  const pad = makePaddler(Date.now() & 0xffff, { asymDur: 0.04, asymInt: 0.08 }); const r = pad.r;
+  let side = 0, rate = 70, v = 3, lat = 53.3811, lon = -1.4701, hd = 1; const t0 = Date.now();
+  const target = () => { const c = ((Date.now() - t0) / 1000) % 180; return c < 90 ? [78, 0] : c < 130 ? [108, (c - 90) / 40] : [55, 0]; };
+  let curSpd = 3;
+  const next = () => {
+    if (!Live.on) return;
+    const [tg, fat] = target(); rate += (tg + gauss(r) * 1.2 - rate) * 0.3;
+    const k = pad.stroke(side, rate, fat); curSpd = pad.dps(rate, fat) * 1000 / k.dur;
+    const now = Date.now();
+    Live.sim.timer = setTimeout(() => { addLiveStroke([now, side, Math.round(k.dur), Math.round(k.water), Math.round(k.gyro), Math.round(k.tilt), Math.round(k.inten), null]); side ^= 1; next(); }, k.dur);
+  };
+  Live.sim = { timer: null, gpsTimer: setInterval(() => { v += (curSpd - v) * 0.35; hd += gauss(r) * 0.03; lat += Math.cos(hd) * v / 111320; lon += Math.sin(hd) * v / 68000; Live.gps.push([Date.now(), +(v + gauss(r) * 0.06).toFixed(3), lat, lon]); }, 1000) };
+  next();
+}
+function stopSim() { if (Live.sim) { clearTimeout(Live.sim.timer); clearInterval(Live.sim.gpsTimer); Live.sim = null; } }
+
+async function startLive() {
+  const sim = $('#optSim').checked;
+  if (!sim && !BLE.connected) {
+    const go = await confirmBox('No sensor connected', 'Connect your sensor on the Sensor tab first, or tick “Simulate a paddle” to try the app without one.', 'Use simulator');
+    if (!go) return; $('#optSim').checked = true; return startLive();
+  }
+  Object.assign(Live, { on: true, src: sim ? 'sim' : 'sensor', start: Date.now(), strokes: [], gps: [], lastVoice: Date.now() });
+  if (sim) startSim();
+  else {
+    BLE.readStatus().catch(() => { });
+    BLE.liveHandler = r => { const off = BLE.bootOffset(); const t = off != null ? off + r.tMs : Date.now() - r.dur; addLiveStroke([t, r.side, r.dur, r.water, r.gyro, r.tilt, r.inten, r.bootId * 4294967296 + r.tMs]); };
+    if ($('#optGps').checked && navigator.geolocation) Live.watch = navigator.geolocation.watchPosition(onGps, e => toast('GPS unavailable: ' + e.message), { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+  }
+  try { Live.wake = await navigator.wakeLock?.request('screen'); } catch (e) { }
+  Live.tick = setInterval(updateLive, 1000);
+  $('#btnStart').hidden = true; $('#btnStop').hidden = false; $('#liveOpts').style.opacity = .5;
+  $('#liveTitle').textContent = sim ? 'Simulated session' : 'Recording'; $('#liveSub').textContent = sim ? 'A virtual paddler doing steady / hard / easy blocks.' : 'Strokes are coming from your sensor.';
+  updateLive();
+}
+async function stopLive() {
+  Live.on = false; stopSim(); BLE.liveHandler = null; clearInterval(Live.tick);
+  if (Live.watch != null) navigator.geolocation.clearWatch(Live.watch); Live.watch = null;
+  try { await Live.wake?.release(); } catch (e) { } Live.wake = null;
+  $('#btnStart').hidden = false; $('#btnStop').hidden = true; $('#liveOpts').style.opacity = 1;
+  $('#liveTitle').textContent = 'Ready to paddle'; $('#liveSub').textContent = 'Connect your sensor, or try the simulator to see how it works.';
+  if (Live.strokes.length < 20) { toast('Session too short to save (under 20 strokes)'); return; }
+  const st = Live.strokes; const h = new Date(Live.start).getHours();
+  const s = { id: uid(), name: Live.src === 'sim' ? 'Simulated paddle' : `${h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening'} paddle`, start: st[0][0], end: st[st.length - 1][0] + st[st.length - 1][2], source: Live.src === 'sim' ? 'demo' : 'live', timeKnown: true, notes: '', rpe: null, strokes: st, gps: Live.gps };
+  await saveSession(s); openSession(s.id);
+}
+function updateLive() {
+  const el = Date.now() - (Live.on ? Live.start : Date.now()); $('#mTime').textContent = fmtDur(el);
+  const st = Live.strokes; $('#mN').textContent = st.length;
+  const last = st.slice(-4); const rate = last.length >= 2 ? 60000 * last.length / sum(last.map(a => a[2])) : null;
+  $('#mRate').textContent = rate ? Math.round(rate) : '–';
+  const tg = $('#mTgt'); const [lo, hi] = settings.target;
+  if (rate) { if (rate < lo) { tg.className = 'tgt lo'; tg.textContent = `▼ Below target (${lo}–${hi})`; } else if (rate > hi) { tg.className = 'tgt hi'; tg.textContent = `▲ Above target (${lo}–${hi})`; } else { tg.className = 'tgt ok'; tg.textContent = `✓ On target (${lo}–${hi})`; } } else { tg.textContent = ''; }
+  const v = liveSpeed(); $('#mSplit').textContent = fmtSplit(v); $('#mSpd').textContent = v != null ? `${fmtSpeed(v)} ${speedUnit()}` : (Live.on && Live.src === 'sensor' && !$('#optGps').checked ? 'GPS off' : '');
+  $('#mDps').textContent = v != null && rate ? (v * 60 / rate).toFixed(2) : '–';
+  const d = liveDistance(); $('#mDist').textContent = d ? (d / 1000).toFixed(2) : '–';
+  const b = st.slice(-20); const Ld = sum(b.filter(a => a[1] === (settings.swap ? 1 : 0)).map(a => a[2])), Rd = sum(b.filter(a => a[1] === (settings.swap ? 0 : 1)).map(a => a[2]));
+  if (Ld + Rd > 0) { const lp = Ld / (Ld + Rd) * 100; $('#balL').style.width = lp + '%'; $('#balR').style.width = (100 - lp) + '%'; $('#balTxt').textContent = `${lp.toFixed(1)} / ${(100 - lp).toFixed(1)}`; }
+  // voice
+  if (Live.on && $('#optVoice').checked && Date.now() - Live.lastVoice > 60000 && rate && 'speechSynthesis' in window) {
+    Live.lastVoice = Date.now(); const sp = v ? fmtSplit(v).split('.')[0].replace(':', ' ') : null;
+    speechSynthesis.speak(new SpeechSynthesisUtterance(`Rate ${Math.round(rate)}.` + (sp ? ` Split ${sp}.` : '')));
+  }
+  // chart
+  const now = Date.now(); const rec = st.filter(a => a[0] > now - 120000);
+  const xs = [], ys = []; for (let i = 0; i < rec.length; i++) { const w = rec.slice(Math.max(0, i - 3), i + 1); xs.push((rec[i][0] - now) / 1000); ys.push(60000 * w.length / sum(w.map(a => a[2]))); }
+  if (!Live.chart || Live.chartEl !== $('#liveChart').firstChild) { Live.chartOpts = { height: 180, series: [{ xs, ys, color: '--rate' }], xMin: -120, xMax: 0, hband: settings.target, xFmt: v => v === 0 ? 'now' : `${Math.round(v)}s`, yFmt: v => Math.round(v), tip: (s, i) => `${Math.round(Live.chartOpts.series[0].ys[i])} spm` }; Live.chart = plot($('#liveChart'), Live.chartOpts); Live.chartEl = $('#liveChart').firstChild; }
+  else { Live.chartOpts.series[0].xs = xs; Live.chartOpts.series[0].ys = ys; Live.chartOpts.hband = settings.target; Live.chart.draw(null); }
+}
+
+/* =====================================================================
+   VIEWS
+   ===================================================================== */
+let curView = 'sessions', curSession = null;
+function show(v) {
+  curView = v; $$('main > section').forEach(s => s.hidden = s.id !== 'view-' + v);
+  $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.view === v || (v === 'session' && b.dataset.view === 'sessions')));
+  if (v === 'sessions') renderSessions(); if (v === 'progress') renderProgress(); if (v === 'sensor') renderSensor(); if (v === 'settings') renderSettings(); if (v === 'live') updateLive();
+  window.scrollTo(0, 0);
+}
+$$('#nav button').forEach(b => b.onclick = () => show(b.dataset.view));
+function updatePill() { $('#pillDot').classList.toggle('on', BLE.connected); $('#pillText').textContent = BLE.connected ? 'Sensor connected' : 'No sensor'; }
+const srcLabel = s => ({ sensor: 'Synced from sensor', live: 'Recorded live', demo: 'Demo' }[s.source] || s.source);
+
+/* ---------- Sessions list ---------- */
+function renderSessions() {
+  const v = $('#view-sessions');
+  if (!sessions.length) {
+    v.innerHTML = `<div class="card empty"><h2>No sessions yet</h2><p class="sub">Go paddling with your sensor and sync it on the Sensor tab, or start a live session.<br>Want to look around first? Load some example sessions.</p><div class="row" style="justify-content:center;margin-top:18px"><button class="primary" id="eDemo">Load demo sessions</button><button class="ghost" id="eLive">Try the live simulator</button></div></div>`;
+    $('#eDemo').onclick = async () => { await addDemoSessions(); renderSessions(); };
+    $('#eLive').onclick = () => { $('#optSim').checked = true; show('live'); };
+    return;
+  }
+  const list = [...sessions].sort((a, b) => b.start - a.start);
+  v.innerHTML = `<div class="row between"><h1>Sessions</h1><span class="note">${list.length} session${list.length > 1 ? 's' : ''}</span></div><div class="list" style="margin-top:14px">${list.map(s => {
+    const A = analyze(s), W = A.whole;
+    return `<button class="sess" data-id="${esc(s.id)}"><div><div class="nm">${esc(s.name)}</div><div class="meta">${s.timeKnown ? fmtDate(s.start) : 'Date unknown'}</div></div><div><span class="chip">${esc(srcLabel(s))}</span></div>
+      <div class="st"><span><b>${fmtDur(W.time)}</b> time</span>${W.dist ? `<span><b>${(W.dist / 1000).toFixed(2)}</b> km</span>` : ''}<span><b>${Math.round(W.rate)}</b> avg spm</span>${W.dps ? `<span><b>${W.dps.toFixed(2)}</b> m/stroke</span>` : ''}<span><b>${A.pieces.length}</b> effort${A.pieces.length === 1 ? '' : 's'}</span>${s.rpe ? `<span>RPE <b>${s.rpe}</b></span>` : ''}</div></button>`;
+  }).join('')}</div>`;
+  $$('.sess', v).forEach(b => b.onclick = () => openSession(b.dataset.id));
+}
+function openSession(id) { curSession = id; show('session'); renderSession(); }
+
+/* ---------- Session detail ---------- */
+function renderSession() {
+  const s = sessions.find(x => x.id === curSession); if (!s) return show('sessions');
+  const A = analyze(s), W = A.whole, v = $('#view-session');
+  const tile = (k, val, u = '') => `<div class="tile"><div class="k">${k}</div><div class="v">${val}<span class="u">${u}</span></div></div>`;
+  const maxRate = Math.max(...A.st.map(x => x.sm));
+  const zt = sum(A.zones) || 1; const zc = ['--z1', '--z2', '--z3', '--z4', '--z5'];
+  const z = settings.zones; const zr = i => i === 0 ? `< ${z[0]}` : i === 4 ? `${z[3]}+` : `${z[i - 1]}–${z[i]}`;
+  const lrRow = (label, sub, l, r, fmt, okPct = 3) => {
+    const m = (l + r) / 2, d = (r - l) / m; const pos = 50 + clamp(d / 0.15, -1, 1) * 46;
+    const txt = Math.abs(d) < 0.005 ? 'Even' : `${d > 0 ? 'Right' : 'Left'} +${Math.abs(d * 100).toFixed(1)}%`;
+    return `<div class="lab">${label}<small>${sub}</small></div><div><div class="meter" title="${txt}"><div class="axis"></div><div class="ok" style="left:${50 - okPct / 15 * 46}%;width:${okPct / 15 * 92}%"></div><div class="mid"></div><div class="mk" style="left:${pos}%;background:${d > 0 ? 'var(--R)' : 'var(--L)'}"></div></div><div class="row between note num" style="font-size:12.5px"><span>L ${fmt(l)}</span><b style="color:var(--text)">${txt}</b><span>R ${fmt(r)}</span></div></div>`;
+  };
+  const Wk = A.work;
+  v.innerHTML = `
+  <div class="row between"><button class="ghost" id="back">← Sessions</button>
+    <div class="row"><label class="btn ghost">Add GPS (.gpx)<input type="file" id="gpxIn" accept=".gpx,application/gpx+xml,application/xml" hidden></label><button class="ghost" id="csvBtn">Export CSV</button><button class="ghost danger-text" id="delBtn">Delete</button></div></div>
+  <h1 contenteditable="true" spellcheck="false" id="sName" title="Click to rename">${esc(s.name)}</h1>
+  <p class="sub">${s.timeKnown ? fmtDate(s.start) : 'Date unknown (sensor lost power before it was synced)'} · ${esc(srcLabel(s))}${s.gpsShift ? ' · GPS aligned by start time' : ''}</p>
+  <div class="tiles">
+    ${tile('Time', fmtDur(W.time))}
+    ${W.dist ? tile('Distance', (W.dist / 1000).toFixed(2), 'km') : ''}
+    ${tile('Strokes', A.n.toLocaleString('en-GB'))}
+    ${tile('Avg rate', Math.round(W.rate), 'spm')}
+    ${tile('Peak rate', Math.round(maxRate), 'spm')}
+    ${W.speed ? tile('Avg split', fmtSplit(W.speed), '/500m') : ''}
+    ${W.dps ? tile('Distance / stroke', W.dps.toFixed(2), 'm') : ''}
+  </div>
+  <h2>Key takeaways</h2>
+  <div class="insights">${A.insights.map(i => `<div class="ins ${i.k}"><div class="tag">${{ focus: '◆ Work on', good: '✓ Strength', info: '● Insight' }[i.k]}</div><h4>${esc(i.h)}</h4><p>${esc(i.p)}</p></div>`).join('')}</div>
+  <div class="card"><h3>Stroke rate</h3><p class="note">Strokes per minute (left and right both count), smoothed over 6 strokes. Shaded areas are the efforts Catch detected.</p><div class="chart" id="cRate"></div></div>
+  ${A.hasGps ? `<div class="card"><h3>Boat speed</h3><p class="note">${speedUnit()}, GPS, smoothed over 6 s</p><div class="chart" id="cSpeed"></div></div>` : `<div class="card"><h3>No speed data for this session</h3><p class="note">Add a .gpx from your GPS watch or Strava (button above) to get splits, distance per stroke and your efficiency curve. In live mode the phone’s GPS is used automatically.</p></div>`}
+  <div class="card"><h3>Efforts</h3>${A.pieces.length ? `<p class="note">Detected where your rate rose clearly above your base pace for 30 s or more.</p><div class="scroll"><table><thead><tr><th>#</th><th>Start</th><th>Time</th>${A.hasGps ? '<th>Dist</th><th>Split</th><th>m/stroke</th>' : ''}<th>Rate</th><th>Rhythm</th><th>L/R timing</th><th>Fade</th></tr></thead><tbody>${A.pieces.map(p => {
+      const d = (p.R.dur - p.L.dur) / ((p.L.dur + p.R.dur) / 2);
+      const f = p.fade ? (p.fade.dps != null ? p.fade.dps : p.fade.inten) : null;
+      return `<tr><td>${p.idx}</td><td>${elapsedFmt((p.t0 - A.t0) / 60000)}</td><td>${fmtDur(p.time)}</td>${A.hasGps ? `<td>${p.dist ? Math.round(p.dist) + ' m' : '–'}</td><td>${fmtSplit(p.speed)}</td><td>${p.dps ? p.dps.toFixed(2) : '–'}</td>` : ''}<td>${Math.round(p.rate)}</td><td>±${p.cv != null ? (p.cv * 100).toFixed(1) : '–'}%</td><td>${Math.abs(d) < 0.005 ? 'Even' : (d > 0 ? 'R' : 'L') + ' +' + Math.abs(d * 100).toFixed(1) + '%'}</td><td>${f == null ? '–' : (f < 0 ? '↓ ' : '↑ ') + Math.abs(f * 100).toFixed(0) + '%' + (p.fade.dps != null ? '' : ' int.')}</td></tr>`;
+    }).join('')}</tbody></table></div><p class="note" style="margin-top:8px">Rhythm = how much the stroke cycle varied (lower is smoother). L/R timing = which side's stroke takes longer. Fade = change in distance per stroke from the first to the last third of the effort${A.hasGps ? '' : ' (pull intensity without GPS)'}.</p>` : `<p class="note">No distinct efforts found, so this looks like a steady session. All analysis below uses the whole session.</p>`}</div>
+  <div class="grid2">
+    <div class="card"><h3>Left vs right</h3><p class="note">${A.pieces.length ? 'During efforts.' : 'Whole session.'} A dot in the green zone means the two sides are well matched.</p>
+      <div class="lr">
+        ${lrRow('Stroke time', 'catch to catch', Wk.L.dur, Wk.R.dur, x => Math.round(x) + ' ms')}
+        ${lrRow('Blade in water', '% of stroke', Wk.L.water, Wk.R.water, x => x.toFixed(0) + '%')}
+        ${lrRow('Shaft angle', 'max, from horizontal', Wk.L.tilt, Wk.R.tilt, x => x.toFixed(0) + '°', 5)}
+        ${lrRow('Pull intensity', 'paddle acceleration', Wk.L.inten, Wk.R.inten, x => x.toFixed(0), 5)}
+        ${lrRow('Rotation speed', 'peak, °/s', Wk.L.gyro, Wk.R.gyro, x => Math.round(x), 5)}
+      </div></div>
+    <div class="card"><h3>Time in rate zones</h3><p class="note">Based on your zone boundaries in Settings</p>
+      <div class="zbar">${A.zones.map((t, i) => t ? `<div style="width:${t / zt * 100}%;background:var(${zc[i]})" title="${ZONE_NAMES[i]}: ${fmtDur(t)}"></div>` : '').join('')}</div>
+      <div class="zl">${A.zones.map((t, i) => `<i style="background:var(${zc[i]})"></i><span>${ZONE_NAMES[i]} <span class="note">${zr(i)} spm</span></span><b class="num">${fmtDur(t)}</b><span class="note num">${Math.round(t / zt * 100)}%</span>`).join('')}</div></div>
+  </div>
+  ${A.bins.length > 8 ? `<div class="card"><h3>Efficiency curve: rate vs distance per stroke</h3><p class="note">Each dot is 12 strokes. Paddling faster always shortens each stroke a bit; a flatter line means you keep more length as the rate goes up.</p><div class="chart" id="cEff"></div><div class="legend"><span><i style="background:var(--rate)"></i>12-stroke block</span>${A.fit ? '<span><i style="background:var(--text2);height:2px;vertical-align:3px"></i>Trend</span>' : ''}</div></div>` : ''}
+  <div class="card"><h3>How did it feel?</h3><p class="note">Rate of perceived exertion, 1 = very easy, 10 = all-out</p>
+    <div class="rpe">${Array.from({ length: 10 }, (_, i) => `<button data-r="${i + 1}" class="${s.rpe === i + 1 ? 'on' : ''}">${i + 1}</button>`).join('')}</div>
+    <textarea id="sNotes" placeholder="Notes: conditions, boat, how it went…">${esc(s.notes || '')}</textarea></div>
+  <details class="card"><summary>Stroke-by-stroke data (first 400 strokes)</summary><div class="scroll" style="margin-top:10px"><table><thead><tr><th>#</th><th>Time</th><th>Side</th><th>Stroke ms</th><th>Rate</th><th>In water</th><th>Angle</th><th>Intensity</th>${A.hasGps ? '<th>Speed</th><th>m/stroke</th>' : ''}</tr></thead><tbody>${A.st.slice(0, 400).map((x, i) => `<tr><td>${i + 1}</td><td>${elapsedFmt((x.t - A.t0) / 60000)}</td><td>${x.side ? 'R' : 'L'}</td><td>${x.dur}</td><td>${Math.round(x.rate)}</td><td>${Math.round(x.water / x.dur * 100)}%</td><td>${x.tilt}°</td><td>${x.inten}</td>${A.hasGps ? `<td>${x.spd != null ? fmtSpeed(x.spd) : '–'}</td><td>${x.dps != null ? x.dps.toFixed(2) : '–'}</td>` : ''}</tr>`).join('')}</tbody></table></div></details>`;
+
+  // charts
+  const xs = A.st.map(x => (x.t - A.t0) / 60000);
+  const bands = A.pieces.map(p => [(p.t0 - A.t0) / 60000, (p.t1 - A.t0) / 60000]);
+  const xMax = (A.t1 - A.t0) / 60000;
+  plot($('#cRate'), { series: [{ xs, ys: A.st.map(x => x.sm), color: '--rate', gapAfter: 0.5 }], bands, xMin: 0, xMax, xFmt: minFmt, yFmt: v => Math.round(v), tip: (si, i) => `<b>${Math.round(A.st[i].sm)} spm</b> · ${elapsedFmt(xs[i])}` });
+  if (A.hasGps) {
+    const G = smoothGps(s.gps.map(p => [p[0] + (s.gpsShift || 0), p[1], p[2], p[3]]));
+    const step = Math.max(1, Math.floor(G.t.length / 1500)); const gx = [], gy = [];
+    for (let i = 0; i < G.t.length; i += step) { const m = (G.t[i] - A.t0) / 60000; if (m < 0 || m > xMax) continue; gx.push(m); gy.push(settings.units === 'mps' ? G.v[i] : G.v[i] * 3.6); }
+    plot($('#cSpeed'), { series: [{ xs: gx, ys: gy, color: '--speed' }], bands, xMin: 0, xMax, yMin: 0, xFmt: minFmt, yFmt: v => v.toFixed(settings.units === 'mps' ? 1 : 0), tip: (si, i) => `<b>${gy[i].toFixed(1)} ${speedUnit()}</b> · ${fmtSplit(settings.units === 'mps' ? gy[i] : gy[i] / 3.6)}/500m · ${elapsedFmt(gx[i])}` });
+  }
+  if ($('#cEff')) {
+    const ser = [{ xs: A.bins.map(b => b.rate), ys: A.bins.map(b => b.dps), color: '--rate', type: 'dot', r: 4.5, alpha: .55 }];
+    if (A.fit) ser.push({ xs: [A.fit.lo, A.fit.hi], ys: [A.fit.a + A.fit.b * A.fit.lo, A.fit.a + A.fit.b * A.fit.hi], color: '--text2', width: 2, dash: [5, 4], noHover: true });
+    plot($('#cEff'), { height: 260, nearest: true, series: ser, xFmt: v => Math.round(v) + ' spm', yFmt: v => v.toFixed(2) + ' m', tip: (si, i) => { const b = A.bins[i]; return `<b>${b.dps.toFixed(2)} m/stroke</b> at ${Math.round(b.rate)} spm<br>${fmtSplit(b.speed)}/500m · ${elapsedFmt((b.t - A.t0) / 60000)}`; } });
+  }
+
+  // wiring
+  $('#back').onclick = () => show('sessions');
+  $('#sName').onblur = async e => { const n = e.target.textContent.trim().slice(0, 80); if (n && n !== s.name) { s.name = n; await saveSession(s); } };
+  $('#sName').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } };
+  $('#sNotes').onchange = async e => { s.notes = e.target.value; await saveSession(s); toast('Notes saved'); };
+  $$('.rpe button', v).forEach(b => b.onclick = async () => { s.rpe = +b.dataset.r; await saveSession(s); $$('.rpe button', v).forEach(x => x.classList.toggle('on', x === b)); });
+  $('#delBtn').onclick = async () => { if (await confirmBox('Delete this session?', 'This removes it from this device. It can’t be undone.', 'Delete', true)) { await deleteSession(s.id); show('sessions'); } };
+  $('#csvBtn').onclick = () => exportCsv(s, A);
+  $('#gpxIn').onchange = async e => { const f = e.target.files[0]; if (f) await attachGpx(s, await f.text()); };
+}
+
+const framed = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+function download(name, text, type) {
+  if (framed) { navigator.clipboard?.writeText(text).then(() => toast('Downloads are blocked in this preview, so the data was copied to your clipboard instead', 4000), () => toast('Downloads are blocked in this preview. Open Catch as its own page to export.', 4000)); return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
+function exportCsv(s, A) {
+  const rows = [['time_iso', 'elapsed_s', 'side', 'stroke_ms', 'rate_spm', 'water_ms', 'max_angle_deg', 'peak_rotation_dps', 'intensity', 'speed_mps', 'm_per_stroke']];
+  for (const x of A.st) rows.push([new Date(x.t).toISOString(), ((x.t - A.t0) / 1000).toFixed(2), x.side ? 'R' : 'L', x.dur, x.rate.toFixed(1), x.water, x.tilt, x.gyro, x.inten, x.spd != null ? x.spd.toFixed(3) : '', x.dps != null ? x.dps.toFixed(3) : '']);
+  download(`catch-${new Date(s.start).toISOString().slice(0, 10)}-${s.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.csv`, rows.map(r => r.join(',')).join('\n'), 'text/csv');
+}
+async function attachGpx(s, text) {
+  try {
+    const doc = new DOMParser().parseFromString(text, 'application/xml');
+    const pts = [...doc.getElementsByTagName('trkpt')].map(p => ({ lat: +p.getAttribute('lat'), lon: +p.getAttribute('lon'), t: Date.parse(p.getElementsByTagName('time')[0]?.textContent || '') })).filter(p => isFinite(p.t) && isFinite(p.lat)).sort((a, b) => a.t - b.t);
+    if (pts.length < 10) return toast('No timed track points found in that file');
+    const gps = [];
+    for (let i = 1; i < pts.length; i++) { const dt = (pts[i].t - pts[i - 1].t) / 1000; if (dt <= 0) continue; const v = haversine(pts[i - 1].lat, pts[i - 1].lon, pts[i].lat, pts[i].lon) / dt; if (v > 12) continue; gps.push([pts[i].t, +v.toFixed(3), pts[i].lat, pts[i].lon]); }
+    const g0 = gps[0][0], g1 = gps[gps.length - 1][0]; const ov = Math.max(0, Math.min(g1, s.end) - Math.max(g0, s.start)) / (s.end - s.start);
+    s.gps = gps; s.gpsShift = 0;
+    if (ov < 0.3) { s.gpsShift = s.start - g0; toast('Track times didn’t overlap, so the GPS start was lined up with the session start'); }
+    else toast(`GPS added (${Math.round(ov * 100)}% overlap)`);
+    if (s.gpsShift) s.gps = s.gps.map(p => [p[0] + s.gpsShift, p[1], p[2], p[3]]);
+    await saveSession(s); renderSession();
+  } catch (e) { toast('Could not read that GPX file'); }
+}
+
+/* ---------- Progress ---------- */
+function renderProgress() {
+  const v = $('#view-progress');
+  const list = [...sessions].filter(s => s.timeKnown).sort((a, b) => a.start - b.start);
+  if (list.length < 2) { v.innerHTML = `<h1>Progress</h1><div class="card empty"><h2>Needs a couple of sessions</h2><p class="sub">Once you have two or more sessions, this shows how your stroke length, balance and volume change over time.</p>${sessions.length ? '' : '<div class="row" style="justify-content:center;margin-top:16px"><button class="primary" id="pDemo">Load demo sessions</button></div>'}</div>`; $('#pDemo') && ($('#pDemo').onclick = async () => { await addDemoSessions(); renderProgress(); }); return; }
+  const an = list.map(s => ({ s, A: analyze(s) }));
+  const totStrokes = sum(an.map(x => x.A.n)), totKm = sum(an.map(x => x.A.whole.dist || 0)) / 1000, totTime = sum(an.map(x => x.A.whole.time));
+  const xs = an.map(x => x.s.start);
+  const z = settings.zones, rEnd = Math.round((z[0] + z[1]) / 2 + 5), rRace = Math.round(z[3] + 3);
+  const d1 = an.map(x => x.A.dpsAt(rEnd)), d2 = an.map(x => x.A.dpsAt(rRace));
+  const lr = an.map(x => { const W = x.A.work; return (W.R.dur - W.L.dur) / ((W.L.dur + W.R.dur) / 2) * 100; });
+  const li = an.map(x => { const W = x.A.work; return (W.L.inten - W.R.inten) / ((W.L.inten + W.R.inten) / 2) * 100; });
+  // weekly volume
+  const wk = new Map(); for (const x of an) { const d = new Date(x.s.start); const day = (d.getDay() + 6) % 7; d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - day); const k = d.getTime(); const o = wk.get(k) || { min: 0, km: 0, n: 0 }; o.min += x.A.whole.time / 60000; o.km += (x.A.whole.dist || 0) / 1000; o.n++; wk.set(k, o); }
+  const weeks = [...wk.entries()].sort((a, b) => a[0] - b[0]).slice(-10); const maxMin = Math.max(...weeks.map(w => w[1].min));
+  const dateFmt = t => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const trend = (arr) => { const p = arr.map((y, i) => [i, y]).filter(q => q[1] != null); if (p.length < 2) return null; return p[p.length - 1][1] - p[0][1]; };
+  const t1 = trend(d1), t2 = trend(d2), tlr = trend(lr.map(Math.abs));
+  const has1 = d1.some(x => x != null), has2 = d2.some(x => x != null);
+  v.innerHTML = `<h1>Progress</h1><p class="sub">${list.length} sessions from ${fmtDate(list[0].start, false)} to ${fmtDate(list[list.length - 1].start, false)}</p>
+  <div class="tiles">
+    <div class="tile"><div class="k">Sessions</div><div class="v">${list.length}</div></div>
+    <div class="tile"><div class="k">Time on water</div><div class="v">${(totTime / 3600000).toFixed(1)}<span class="u">h</span></div></div>
+    ${totKm ? `<div class="tile"><div class="k">Distance</div><div class="v">${totKm.toFixed(1)}<span class="u">km</span></div></div>` : ''}
+    <div class="tile"><div class="k">Strokes</div><div class="v">${totStrokes.toLocaleString('en-GB')}</div></div>
+  </div>
+  ${has1 || has2 ? `<div class="card"><h3>Distance per stroke at fixed rates</h3><p class="note">How far each stroke carries you at the same rate, which is the clearest sign of better technique and power. Higher is better.</p>
+    <div class="chart" id="pDps"></div>
+    <div class="legend">${has1 ? `<span><i style="background:var(--L)"></i>At ${rEnd} spm (endurance)${t1 != null ? `: ${t1 >= 0 ? '+' : ''}${t1.toFixed(2)} m since first session` : ''}</span>` : ''}${has2 ? `<span><i style="background:var(--R)"></i>At ${rRace} spm (race)${t2 != null ? `: ${t2 >= 0 ? '+' : ''}${t2.toFixed(2)} m since first session` : ''}</span>` : ''}</div></div>` : `<div class="card"><h3>Distance per stroke</h3><p class="note">Add GPS to your sessions to track stroke length over time.</p></div>`}
+  <div class="card"><h3>Left / right balance</h3><p class="note">0 = perfectly even. Above the line means that side's stroke takes longer or pulls harder.${tlr != null ? ` Timing gap ${tlr <= 0 ? 'shrank' : 'grew'} by ${Math.abs(tlr).toFixed(1)} points since your first session.` : ''}</p>
+    <div class="chart" id="pLr"></div>
+    <div class="legend"><span><i style="background:var(--rate)"></i>Timing: right longer (+) / left longer (−)</span><span><i style="background:var(--speed)"></i>Intensity: left harder (+) / right harder (−)</span></div></div>
+  <div class="card"><h3>Weekly volume</h3><div class="wk" style="margin-top:10px">${weeks.map(([k, o]) => `<span class="note">w/c ${dateFmt(k)}</span><div><div class="b" style="width:${o.min / maxMin * 100}%"></div></div><span class="num">${Math.round(o.min)} min${o.km ? ` · ${o.km.toFixed(1)} km` : ''} · ${o.n}×</span>`).join('')}</div></div>`;
+  const dayTicks = (a, b) => { const n = Math.min(list.length, 5); return Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1 || 1)); };
+  if ($('#pDps')) {
+    const mk = (d, color) => { const idx = d.map((y, i) => y == null ? -1 : i).filter(i => i >= 0); return { xs: idx.map(i => xs[i]), ys: idx.map(i => d[i]), idx, color, markers: true }; };
+    const ser = []; if (has1) ser.push(mk(d1, '--L')); if (has2) ser.push(mk(d2, '--R'));
+    plot($('#pDps'), { series: ser, nearest: true, xMin: xs[0], xMax: xs[xs.length - 1], xTicks: dayTicks, xFmt: dateFmt, yFmt: v => v.toFixed(2) + ' m', tip: (si, i) => { const k = ser[si].idx[i]; return `<b>${ser[si].ys[i].toFixed(2)} m/stroke</b><br>${esc(an[k].s.name)} · ${dateFmt(xs[k])}`; } });
+  }
+  const lser = [{ xs, ys: lr, color: '--rate', markers: true }, { xs, ys: li, color: '--speed', markers: true }];
+  plot($('#pLr'), { series: lser, nearest: true, zeroLine: true, xTicks: dayTicks, xFmt: dateFmt, yFmt: v => (v > 0 ? '+' : '') + v.toFixed(0) + '%', tip: (si, i) => `<b>${si ? 'Intensity' : 'Timing'} ${lser[si].ys[i] > 0 ? '+' : ''}${lser[si].ys[i].toFixed(1)}%</b><br>${esc(an[i].s.name)} · ${dateFmt(xs[i])}` });
+}
+
+/* ---------- Sensor ---------- */
+function renderSensor() {
+  $('#bleWarn').innerHTML = BLE.supported ? '' : `<div class="warnbox" style="margin:12px 0"><b>Bluetooth isn't available in this browser view.</b> Open Catch as its own page in Chrome or Edge on Android, Windows, Mac or Chromebook. On iPhone, use the free Bluefy browser, since Safari doesn't support Web Bluetooth. Demo sessions, the simulator and GPX import still work here.</div>`;
+  $('#btnConnect').disabled = !BLE.supported;
+  $('#btnConnect').hidden = BLE.connected; $('#btnDisconnect').hidden = !BLE.connected;
+  $('#sActions').hidden = !BLE.connected; $('#sTiles').hidden = !BLE.connected || !BLE.status;
+  if (BLE.connected && BLE.status) {
+    const st = BLE.status; const pctB = clamp(Math.round((st.mv - 3300) / 900 * 100), 0, 100);
+    $('#sState').textContent = BLE.dev?.name || 'CatchSensor'; $('#sDetail').textContent = st.flashOk ? 'Connected. Clock synced.' : 'Connected, but the sensor reports a memory problem.';
+    const strokesStored = Math.max(0, st.records); const cap = 131071;
+    $('#sTiles').innerHTML = `<div class="tile"><div class="k">Battery</div><div class="v">${pctB}<span class="u">% · ${(st.mv / 1000).toFixed(2)} V</span></div></div><div class="tile"><div class="k">Stored records</div><div class="v">${strokesStored.toLocaleString('en-GB')}</div></div><div class="tile"><div class="k">Memory used</div><div class="v">${(strokesStored / cap * 100).toFixed(1)}<span class="u">%</span></div></div><div class="tile"><div class="k">On for</div><div class="v">${fmtDur(st.millis + (Date.now() - BLE.statusAt))}</div></div>`;
+  } else if (!BLE.connected) { $('#sState').textContent = 'Not connected'; $('#sDetail').textContent = 'Give the paddle a shake to wake the sensor (two green blinks), then press Connect.'; }
+}
+$('#btnConnect').onclick = async () => {
+  try { $('#sDetail').textContent = 'Choose “CatchSensor” in the browser popup…'; await BLE.connect(); toast('Sensor connected'); }
+  catch (e) { $('#sDetail').textContent = e.name === 'NotFoundError' ? 'No sensor chosen.' : e.name === 'SecurityError' ? 'This browser view blocks Bluetooth. Open Catch as its own page (see the note above).' : 'Could not connect: ' + e.message; }
+  renderSensor(); updatePill();
+};
+$('#btnDisconnect').onclick = () => { BLE.disconnect(); renderSensor(); updatePill(); };
+$('#btnSync').onclick = async () => {
+  const total = BLE.status?.records || 1; $('#syncProg').hidden = false; $('#btnSync').disabled = true;
+  try {
+    const recs = await BLE.download(n => { $('#syncBar').style.width = Math.min(100, n / total * 100) + '%'; $('#syncTxt').textContent = `Downloading ${n.toLocaleString('en-GB')} / ${total.toLocaleString('en-GB')} records…`; });
+    const ns = recordsToSessions(recs);
+    for (const s of ns) await saveSession(s);
+    $('#syncBar').style.width = '100%'; $('#syncTxt').textContent = ns.length ? `Imported ${ns.length} new session${ns.length > 1 ? 's' : ''}.` : 'Everything on the sensor is already in the app.';
+    if (ns.length) toast(`${ns.length} new session${ns.length > 1 ? 's' : ''} added`);
+  } catch (e) { $('#syncTxt').textContent = 'Sync failed: ' + e.message; }
+  $('#btnSync').disabled = false;
+};
+$('#btnErase').onclick = async () => {
+  if (!await confirmBox('Clear the sensor’s memory?', 'Sync first! Any strokes not yet in the app will be lost. Sessions already in the app are kept.', 'Clear memory', true)) return;
+  try { await BLE.erase(); toast('Clearing sensor memory (takes ~20 s)…', 4000); } catch (e) { toast('Failed: ' + e.message); }
+};
+
+/* ---------- Settings ---------- */
+function renderSettings() {
+  $('#setName').value = settings.name; $('#setSwap').checked = settings.swap; $('#setUnits').value = settings.units; $('#setGap').value = settings.gapMin;
+  $('#setTlo').value = settings.target[0]; $('#setThi').value = settings.target[1];
+  $('#setZones').innerHTML = settings.zones.map((z, i) => `<input type="number" data-i="${i}" value="${z}" aria-label="Zone boundary ${i + 1}">`).join('');
+  $$('#setZones input').forEach(inp => inp.onchange = () => { const z = $$('#setZones input').map(x => +x.value); if (z.every((v, i) => !i || v > z[i - 1])) { settings.zones = z; saveSettings(); toast('Zones updated'); } else { toast('Boundaries must go up from left to right'); renderSettings(); } });
+}
+$('#setName').onchange = e => { settings.name = e.target.value; saveSettings(); };
+$('#setSwap').onchange = e => { settings.swap = e.target.checked; saveSettings(); toast('Left and right swapped'); };
+$('#setUnits').onchange = e => { settings.units = e.target.value; saveSettings(); };
+$('#setGap').onchange = e => { settings.gapMin = clamp(+e.target.value || 5, 1, 120); saveSettings(); };
+$('#setTlo').onchange = $('#setThi').onchange = () => { const lo = +$('#setTlo').value, hi = +$('#setThi').value; if (lo < hi) { settings.target = [lo, hi]; saveSettings(); } };
+$('#btnBackup').onclick = () => download(`catch-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify({ app: 'catch', v: 1, settings, sessions }), 'application/json');
+$('#inBackup').onchange = async e => {
+  try { const d = JSON.parse(await e.target.files[0].text()); if (!Array.isArray(d.sessions)) throw 0; let n = 0; for (const s of d.sessions) { if (!sessions.some(x => x.id === s.id)) { await saveSession(s); n++; } } if (d.settings) { settings = { ...DEFAULTS, ...d.settings }; saveSettings(); renderSettings(); } toast(`Imported ${n} session${n === 1 ? '' : 's'}`); }
+  catch (err) { toast('That doesn’t look like a Catch backup'); }
+};
+$('#btnDemoAdd').onclick = async () => { await addDemoSessions(); };
+$('#btnDemoDel').onclick = async () => { const d = sessions.filter(s => s.source === 'demo'); for (const s of d) await deleteSession(s.id); toast(`Removed ${d.length} demo session${d.length === 1 ? '' : 's'}`); };
+$('#btnWipe').onclick = async () => { if (await confirmBox('Delete all sessions?', 'Everything stored in Catch on this device will be removed. Export a backup first if you want to keep it.', 'Delete everything', true)) { for (const s of [...sessions]) await deleteSession(s.id); toast('All sessions deleted'); } };
+
+/* ---------- live buttons ---------- */
+$('#btnStart').onclick = startLive;
+$('#btnStop').onclick = stopLive;
+
+/* ---------- boot ---------- */
+(async () => {
+  await Store.init();
+  sessions = await Store.all();
+  updatePill();
+  show(sessions.length ? 'sessions' : 'sessions');
+  if (!BLE.supported) $('#optSim').checked = true;
+})();
+</script>
+</body>
+</html>

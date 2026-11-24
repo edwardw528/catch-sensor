@@ -7,11 +7,11 @@
 <style>
 :root{
   color-scheme: light;
-  --bg:#f3f3f0; --card:#ffffff; --line:#e3e2dd; --grid:#ecebe7;
-  --text:#0b0b0b; --text2:#52514e; --muted:#85847f;
+  --bg:#ffffff; --card:#ffffff; --line:#e4e4e4; --grid:#efefef;
+  --text:#111111; --text2:#555555; --muted:#8a8a8a;
   --L:#2a78d6; --R:#eb6834; --rate:#6250d6; --speed:#1baf7a;
   --band:rgba(98,80,214,.09); --target:rgba(27,175,122,.12);
-  --good:#0a7d3c; --good-bg:#e7f5ec; --warn:#9a5b00; --warn-bg:#fdf1dc; --info:#3a3a38; --info-bg:#f0efeb;
+  --good:#0a7d3c; --good-bg:#e7f5ec; --warn:#9a5b00; --warn-bg:#fdf1dc; --info:#3a3a3a; --info-bg:#f2f2f2;
   --z1:#e1ddf8; --z2:#b8aff0; --z3:#8f80e3; --z4:#6250d6; --z5:#3d2e9a;
   --btn:#0b0b0b; --btn-text:#ffffff; --danger:#c0392b;
   --radius:14px;
@@ -19,8 +19,8 @@
 @media (prefers-color-scheme: dark){
   :root{
     color-scheme: dark;
-    --bg:#101010; --card:#1a1a19; --line:#2d2d2b; --grid:#262624;
-    --text:#f0efec; --text2:#c3c2b7; --muted:#8d8c86;
+    --bg:#121212; --card:#121212; --line:#2e2e2e; --grid:#232323;
+    --text:#f0f0f0; --text2:#bdbdbd; --muted:#8c8c8c;
     --L:#3987e5; --R:#d95926; --rate:#9085e9; --speed:#199e70;
     --band:rgba(144,133,233,.13); --target:rgba(25,158,112,.18);
     --good:#5fd08f; --good-bg:#15291d; --warn:#f0b354; --warn-bg:#2e2310; --info:#d8d7d0; --info-bg:#232321;
@@ -32,7 +32,7 @@
 html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
 .num{font-variant-numeric:tabular-nums}
-header.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;padding:10px 20px;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+header.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;padding:10px 20px;background:var(--bg);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:19px;letter-spacing:-.02em}
 .brand svg{width:26px;height:26px}
 nav#nav{display:flex;gap:4px;margin-left:12px}
@@ -48,8 +48,9 @@ h2{font-size:18px;margin:28px 0 10px;letter-spacing:-.01em}
 h3{font-size:15px;margin:0 0 4px}
 p.sub,.note{color:var(--text2);margin:0}
 .note{font-size:13px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin:12px 0}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{border-top:1px solid var(--line);padding:22px 0 18px;margin:0}
+:focus-visible{outline:2px solid var(--rate);outline-offset:2px;border-radius:4px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 40px}
 .grid2>.card{margin:0}
 .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .between{justify-content:space-between}
@@ -59,25 +60,25 @@ button.danger{background:var(--danger);color:#fff;border-color:var(--danger)}
 .danger-text{color:var(--danger)!important}
 button.big{padding:14px 26px;font-size:17px}
 button:disabled{opacity:.45;cursor:default}
-.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin:16px 0}
-.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-.tile .k{font-size:12px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-.tile .v{font-size:24px;font-weight:750;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:14px 28px;margin:18px 0 26px}
+.tile{padding:0}
+.tile .k{font-size:13.5px;color:var(--text2)}
+.tile .v{font-size:26px;font-weight:750;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .tile .u{font-size:13px;color:var(--text2);font-weight:500;margin-left:3px}
 .chart{position:relative;width:100%;margin-top:8px;touch-action:pan-y}
 .chart canvas{display:block}
 .tip{position:absolute;pointer-events:none;background:var(--text);color:var(--bg);font-size:12px;padding:6px 9px;border-radius:8px;white-space:nowrap;opacity:0;transition:opacity .1s;z-index:5;font-variant-numeric:tabular-nums}
 .legend{display:flex;gap:14px;font-size:13px;color:var(--text2);margin-top:4px;flex-wrap:wrap}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
-.insights{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
-.ins{border-radius:12px;padding:14px 16px;border:1px solid var(--line)}
-.ins.focus{background:var(--warn-bg)} .ins.good{background:var(--good-bg)} .ins.info{background:var(--info-bg)}
-.ins .tag{font-size:11.5px;font-weight:750;text-transform:uppercase;letter-spacing:.06em}
-.ins.focus .tag{color:var(--warn)} .ins.good .tag{color:var(--good)} .ins.info .tag{color:var(--info)}
-.ins h4{margin:4px 0 4px;font-size:15.5px}
-.ins p{margin:0;color:var(--text2);font-size:14px}
+.insights{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:4px 40px}
+.ins-group h3{font-size:15px;margin:0 0 2px}
+.ins-group.focus h3{color:var(--warn)} .ins-group.good h3{color:var(--good)} .ins-group.info h3{color:var(--text2)}
+.ins{padding:10px 0;border-bottom:1px solid var(--grid)}
+.ins:last-child{border-bottom:0}
+.ins h4{margin:0 0 3px;font-size:15.5px}
+.ins p{margin:0;color:var(--text2);font-size:14px;max-width:62ch}
 table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
-th{text-align:left;color:var(--text2);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding:6px 8px;border-bottom:1px solid var(--line)}
+th{text-align:left;color:var(--text2);font-weight:500;font-size:13px;padding:6px 8px;border-bottom:1px solid var(--line)}
 td{padding:8px;border-bottom:1px solid var(--grid);white-space:nowrap}
 .scroll{overflow-x:auto}
 .lr{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;align-items:center;margin-top:10px}
@@ -93,21 +94,21 @@ td{padding:8px;border-bottom:1px solid var(--grid);white-space:nowrap}
 .zbar div{height:100%}
 .zl{display:grid;grid-template-columns:auto 1fr auto auto;gap:4px 10px;font-size:13.5px;align-items:center}
 .zl i{width:10px;height:10px;border-radius:3px;display:inline-block}
-.list{display:grid;gap:10px}
-.sess{display:grid;grid-template-columns:1fr auto;gap:4px 14px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;cursor:pointer;text-align:left;width:100%}
-.sess:hover{border-color:var(--muted)}
+.list{display:grid;border-top:1px solid var(--line)}
+.sess{display:grid;grid-template-columns:1fr auto;gap:4px 14px;background:none;border:0;border-bottom:1px solid var(--line);padding:14px 4px;cursor:pointer;text-align:left;width:100%}
+.sess:hover{background:var(--info-bg)}
 .sess .nm{font-weight:700;font-size:16px}
 .sess .meta{color:var(--text2);font-size:13.5px}
 .sess .st{display:flex;gap:16px;font-variant-numeric:tabular-nums;font-size:14px;grid-column:1/-1;color:var(--text2);flex-wrap:wrap}
 .sess .st b{color:var(--text)}
-.chip{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--info-bg);color:var(--text2);text-transform:uppercase;letter-spacing:.04em}
+.chip{font-size:13px;color:var(--text2)}
 .empty{text-align:center;padding:50px 20px}
 .empty h2{margin-top:0}
 /* live */
 .live-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
-.metric{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
-.metric .k{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text2)}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:0 28px;margin:18px 0 8px}
+.metric{border-top:1px solid var(--line);padding:12px 0 14px}
+.metric .k{font-size:14px;color:var(--text2)}
 .metric .v{font-size:34px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.1}
 .metric .u{font-size:13px;color:var(--text2)}
 .metric.hero{grid-column:span 2}
@@ -163,7 +164,7 @@ details summary{cursor:pointer;font-weight:700}
     <button data-view="sensor">Sensor</button>
     <button data-view="settings">Settings</button>
   </nav>
-  <div class="pill" id="pill"><span class="dot" id="pillDot"></span><span id="pillText">No sensor</span></div>
+  <div class="pill" id="pill"><span id="pillText">No sensor</span></div>
 </header>
 
 <main>
@@ -259,6 +260,10 @@ details summary{cursor:pointer;font-weight:700}
     </div>
   </div>
   <div class="card">
+    <h3>About and privacy</h3>
+    <p class="note" style="max-width:62ch;margin-top:4px">Catch keeps everything on this device. Sessions and settings are saved in this browser's storage and are never uploaded. GPS is only used while a live session is recording, and only to work out speed. There are no accounts, cookies, ads or analytics. Clearing your browser data deletes your sessions, so export a backup now and then.</p>
+  </div>
+  <div class="card">
     <h3>Your data</h3>
     <p class="note">Everything is stored on this device only.</p>
     <div class="row" style="margin-top:10px">
@@ -310,7 +315,7 @@ function fmtDur(ms) { if (!isFinite(ms)) return '–'; const s = Math.round(ms /
 function fmtSplit(mps) { if (!mps || !isFinite(mps) || mps < 0.3) return '–'; const s = 500 / mps; return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`; }
 function fmtSpeed(mps) { if (mps == null || !isFinite(mps)) return '–'; return settings.units === 'mps' ? mps.toFixed(2) : (mps * 3.6).toFixed(1); }
 const speedUnit = () => settings.units === 'mps' ? 'm/s' : 'km/h';
-function fmtDate(ms, withTime = true) { const d = new Date(ms); const o = { weekday: 'short', day: 'numeric', month: 'short' }; if (d.getFullYear() !== new Date().getFullYear()) o.year = 'numeric'; return d.toLocaleDateString('en-GB', o) + (withTime ? ' · ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''); }
+function fmtDate(ms, withTime = true) { const d = new Date(ms); const o = { weekday: 'short', day: 'numeric', month: 'short' }; if (d.getFullYear() !== new Date().getFullYear()) o.year = 'numeric'; return d.toLocaleDateString('en-GB', o) + (withTime ? ', ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''); }
 const pct = (x, d = 1) => (x > 0 ? '+' : '') + (x * 100).toFixed(d) + '%';
 
 /* ---------- settings ---------- */
@@ -513,6 +518,7 @@ function niceTicks(min, max, count = 4) {
 function plot(el, o) {
   el.innerHTML = ''; el.style.position = 'relative';
   const c = document.createElement('canvas'); const tip = document.createElement('div'); tip.className = 'tip';
+  c.setAttribute('role', 'img'); c.setAttribute('aria-label', o.label || 'Chart');
   el.append(c, tip);
   const H = o.height || 220; let geom = null;
   function draw(hover) {
@@ -820,7 +826,7 @@ function updateLive() {
   // chart
   const now = Date.now(); const rec = st.filter(a => a[0] > now - 120000);
   const xs = [], ys = []; for (let i = 0; i < rec.length; i++) { const w = rec.slice(Math.max(0, i - 3), i + 1); xs.push((rec[i][0] - now) / 1000); ys.push(60000 * w.length / sum(w.map(a => a[2]))); }
-  if (!Live.chart || Live.chartEl !== $('#liveChart').firstChild) { Live.chartOpts = { height: 180, series: [{ xs, ys, color: '--rate' }], xMin: -120, xMax: 0, hband: settings.target, xFmt: v => v === 0 ? 'now' : `${Math.round(v)}s`, yFmt: v => Math.round(v), tip: (s, i) => `${Math.round(Live.chartOpts.series[0].ys[i])} spm` }; Live.chart = plot($('#liveChart'), Live.chartOpts); Live.chartEl = $('#liveChart').firstChild; }
+  if (!Live.chart || Live.chartEl !== $('#liveChart').firstChild) { Live.chartOpts = { label: 'Stroke rate over the last two minutes, with your target band.', height: 180, series: [{ xs, ys, color: '--rate' }], xMin: -120, xMax: 0, hband: settings.target, xFmt: v => v === 0 ? 'now' : `${Math.round(v)}s`, yFmt: v => Math.round(v), tip: (s, i) => `${Math.round(Live.chartOpts.series[0].ys[i])} spm` }; Live.chart = plot($('#liveChart'), Live.chartOpts); Live.chartEl = $('#liveChart').firstChild; }
   else { Live.chartOpts.series[0].xs = xs; Live.chartOpts.series[0].ys = ys; Live.chartOpts.hband = settings.target; Live.chart.draw(null); }
 }
 
@@ -835,8 +841,8 @@ function show(v) {
   window.scrollTo(0, 0);
 }
 $$('#nav button').forEach(b => b.onclick = () => show(b.dataset.view));
-function updatePill() { $('#pillDot').classList.toggle('on', BLE.connected); $('#pillText').textContent = BLE.connected ? 'Sensor connected' : 'No sensor'; }
-const srcLabel = s => ({ sensor: 'Synced from sensor', live: 'Recorded live', demo: 'Demo' }[s.source] || s.source);
+function updatePill() { $('#pill').style.color = BLE.connected ? 'var(--good)' : ''; $('#pillText').textContent = BLE.connected ? 'Sensor connected' : 'No sensor'; }
+const srcLabel = s => ({ sensor: 'Synced from sensor', live: 'Recorded live', demo: 'Demo session' }[s.source] || s.source);
 
 /* ---------- Sessions list ---------- */
 function renderSessions() {
@@ -875,7 +881,7 @@ function renderSession() {
   <div class="row between"><button class="ghost" id="back">← Sessions</button>
     <div class="row"><label class="btn ghost">Add GPS (.gpx)<input type="file" id="gpxIn" accept=".gpx,application/gpx+xml,application/xml" hidden></label><button class="ghost" id="csvBtn">Export CSV</button><button class="ghost danger-text" id="delBtn">Delete</button></div></div>
   <h1 contenteditable="true" spellcheck="false" id="sName" title="Click to rename">${esc(s.name)}</h1>
-  <p class="sub">${s.timeKnown ? fmtDate(s.start) : 'Date unknown (sensor lost power before it was synced)'} · ${esc(srcLabel(s))}${s.gpsShift ? ' · GPS aligned by start time' : ''}</p>
+  <p class="sub">${s.timeKnown ? fmtDate(s.start) : 'Date unknown (sensor lost power before it was synced)'}</p><p class="note">${esc(srcLabel(s))}${s.gpsShift ? '. GPS lined up by start time' : ''}</p>
   <div class="tiles">
     ${tile('Time', fmtDur(W.time))}
     ${W.dist ? tile('Distance', (W.dist / 1000).toFixed(2), 'km') : ''}
@@ -886,7 +892,7 @@ function renderSession() {
     ${W.dps ? tile('Distance / stroke', W.dps.toFixed(2), 'm') : ''}
   </div>
   <h2>Key takeaways</h2>
-  <div class="insights">${A.insights.map(i => `<div class="ins ${i.k}"><div class="tag">${{ focus: '◆ Work on', good: '✓ Strength', info: '● Insight' }[i.k]}</div><h4>${esc(i.h)}</h4><p>${esc(i.p)}</p></div>`).join('')}</div>
+  <div class="insights">${['focus', 'good', 'info'].filter(k => A.insights.some(i => i.k === k)).map(k => `<div class="ins-group ${k}"><h3>${{ focus: 'Work on', good: 'Going well', info: 'Also noticed' }[k]}</h3>${A.insights.filter(i => i.k === k).map(i => `<div class="ins"><h4>${esc(i.h)}</h4><p>${esc(i.p)}</p></div>`).join('')}</div>`).join('')}</div>
   <div class="card"><h3>Stroke rate</h3><p class="note">Strokes per minute (left and right both count), smoothed over 6 strokes. Shaded areas are the efforts Catch detected.</p><div class="chart" id="cRate"></div></div>
   ${A.hasGps ? `<div class="card"><h3>Boat speed</h3><p class="note">${speedUnit()}, GPS, smoothed over 6 s</p><div class="chart" id="cSpeed"></div></div>` : `<div class="card"><h3>No speed data for this session</h3><p class="note">Add a .gpx from your GPS watch or Strava (button above) to get splits, distance per stroke and your efficiency curve. In live mode the phone’s GPS is used automatically.</p></div>`}
   <div class="card"><h3>Efforts</h3>${A.pieces.length ? `<p class="note">Detected where your rate rose clearly above your base pace for 30 s or more.</p><div class="scroll"><table><thead><tr><th>#</th><th>Start</th><th>Time</th>${A.hasGps ? '<th>Dist</th><th>Split</th><th>m/stroke</th>' : ''}<th>Rate</th><th>Rhythm</th><th>L/R timing</th><th>Fade</th></tr></thead><tbody>${A.pieces.map(p => {
@@ -917,17 +923,17 @@ function renderSession() {
   const xs = A.st.map(x => (x.t - A.t0) / 60000);
   const bands = A.pieces.map(p => [(p.t0 - A.t0) / 60000, (p.t1 - A.t0) / 60000]);
   const xMax = (A.t1 - A.t0) / 60000;
-  plot($('#cRate'), { series: [{ xs, ys: A.st.map(x => x.sm), color: '--rate', gapAfter: 0.5 }], bands, xMin: 0, xMax, xFmt: minFmt, yFmt: v => Math.round(v), tip: (si, i) => `<b>${Math.round(A.st[i].sm)} spm</b> · ${elapsedFmt(xs[i])}` });
+  plot($('#cRate'), { label: `Stroke rate over ${fmtDur(W.time)}: average ${Math.round(W.rate)} spm, peak ${Math.round(maxRate)} spm, ${A.pieces.length} efforts. Full data in the stroke-by-stroke table.`, series: [{ xs, ys: A.st.map(x => x.sm), color: '--rate', gapAfter: 0.5 }], bands, xMin: 0, xMax, xFmt: minFmt, yFmt: v => Math.round(v), tip: (si, i) => `<b>${Math.round(A.st[i].sm)} spm</b>, ${elapsedFmt(xs[i])}` });
   if (A.hasGps) {
     const G = smoothGps(s.gps.map(p => [p[0] + (s.gpsShift || 0), p[1], p[2], p[3]]));
     const step = Math.max(1, Math.floor(G.t.length / 1500)); const gx = [], gy = [];
     for (let i = 0; i < G.t.length; i += step) { const m = (G.t[i] - A.t0) / 60000; if (m < 0 || m > xMax) continue; gx.push(m); gy.push(settings.units === 'mps' ? G.v[i] : G.v[i] * 3.6); }
-    plot($('#cSpeed'), { series: [{ xs: gx, ys: gy, color: '--speed' }], bands, xMin: 0, xMax, yMin: 0, xFmt: minFmt, yFmt: v => v.toFixed(settings.units === 'mps' ? 1 : 0), tip: (si, i) => `<b>${gy[i].toFixed(1)} ${speedUnit()}</b> · ${fmtSplit(settings.units === 'mps' ? gy[i] : gy[i] / 3.6)}/500m · ${elapsedFmt(gx[i])}` });
+    plot($('#cSpeed'), { label: `Boat speed over the session, average ${fmtSpeed(W.speed)} ${speedUnit()}.`, series: [{ xs: gx, ys: gy, color: '--speed' }], bands, xMin: 0, xMax, yMin: 0, xFmt: minFmt, yFmt: v => v.toFixed(settings.units === 'mps' ? 1 : 0), tip: (si, i) => `<b>${gy[i].toFixed(1)} ${speedUnit()}</b>, ${fmtSplit(settings.units === 'mps' ? gy[i] : gy[i] / 3.6)}/500m, ${elapsedFmt(gx[i])}` });
   }
   if ($('#cEff')) {
     const ser = [{ xs: A.bins.map(b => b.rate), ys: A.bins.map(b => b.dps), color: '--rate', type: 'dot', r: 4.5, alpha: .55 }];
     if (A.fit) ser.push({ xs: [A.fit.lo, A.fit.hi], ys: [A.fit.a + A.fit.b * A.fit.lo, A.fit.a + A.fit.b * A.fit.hi], color: '--text2', width: 2, dash: [5, 4], noHover: true });
-    plot($('#cEff'), { height: 260, nearest: true, series: ser, xFmt: v => Math.round(v) + ' spm', yFmt: v => v.toFixed(2) + ' m', tip: (si, i) => { const b = A.bins[i]; return `<b>${b.dps.toFixed(2)} m/stroke</b> at ${Math.round(b.rate)} spm<br>${fmtSplit(b.speed)}/500m · ${elapsedFmt((b.t - A.t0) / 60000)}`; } });
+    plot($('#cEff'), { label: A.fit ? `Distance per stroke falls by ${(-A.fit.b * 10).toFixed(2)} m for every 10 spm increase in rate.` : 'Rate against distance per stroke.', height: 260, nearest: true, series: ser, xFmt: v => Math.round(v) + ' spm', yFmt: v => v.toFixed(2) + ' m', tip: (si, i) => { const b = A.bins[i]; return `<b>${b.dps.toFixed(2)} m/stroke</b> at ${Math.round(b.rate)} spm<br>${fmtSplit(b.speed)}/500m at ${elapsedFmt((b.t - A.t0) / 60000)}`; } });
   }
 
   // wiring
@@ -998,15 +1004,15 @@ function renderProgress() {
   <div class="card"><h3>Left / right balance</h3><p class="note">0 = perfectly even. Above the line means that side's stroke takes longer or pulls harder.${tlr != null ? ` Timing gap ${tlr <= 0 ? 'shrank' : 'grew'} by ${Math.abs(tlr).toFixed(1)} points since your first session.` : ''}</p>
     <div class="chart" id="pLr"></div>
     <div class="legend"><span><i style="background:var(--rate)"></i>Timing: right longer (+) / left longer (−)</span><span><i style="background:var(--speed)"></i>Intensity: left harder (+) / right harder (−)</span></div></div>
-  <div class="card"><h3>Weekly volume</h3><div class="wk" style="margin-top:10px">${weeks.map(([k, o]) => `<span class="note">w/c ${dateFmt(k)}</span><div><div class="b" style="width:${o.min / maxMin * 100}%"></div></div><span class="num">${Math.round(o.min)} min${o.km ? ` · ${o.km.toFixed(1)} km` : ''} · ${o.n}×</span>`).join('')}</div></div>`;
+  <div class="card"><h3>Weekly volume</h3><div class="wk" style="margin-top:10px">${weeks.map(([k, o]) => `<span class="note">w/c ${dateFmt(k)}</span><div><div class="b" style="width:${o.min / maxMin * 100}%"></div></div><span class="num">${Math.round(o.min)} min${o.km ? `, ${o.km.toFixed(1)} km` : ''}, ${o.n}×</span>`).join('')}</div></div>`;
   const dayTicks = (a, b) => { const n = Math.min(list.length, 5); return Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1 || 1)); };
   if ($('#pDps')) {
     const mk = (d, color) => { const idx = d.map((y, i) => y == null ? -1 : i).filter(i => i >= 0); return { xs: idx.map(i => xs[i]), ys: idx.map(i => d[i]), idx, color, markers: true }; };
     const ser = []; if (has1) ser.push(mk(d1, '--L')); if (has2) ser.push(mk(d2, '--R'));
-    plot($('#pDps'), { series: ser, nearest: true, xMin: xs[0], xMax: xs[xs.length - 1], xTicks: dayTicks, xFmt: dateFmt, yFmt: v => v.toFixed(2) + ' m', tip: (si, i) => { const k = ser[si].idx[i]; return `<b>${ser[si].ys[i].toFixed(2)} m/stroke</b><br>${esc(an[k].s.name)} · ${dateFmt(xs[k])}`; } });
+    plot($('#pDps'), { label: 'Distance per stroke at fixed rates for each session.', series: ser, nearest: true, xMin: xs[0], xMax: xs[xs.length - 1], xTicks: dayTicks, xFmt: dateFmt, yFmt: v => v.toFixed(2) + ' m', tip: (si, i) => { const k = ser[si].idx[i]; return `<b>${ser[si].ys[i].toFixed(2)} m/stroke</b><br>${esc(an[k].s.name)}, ${dateFmt(xs[k])}`; } });
   }
   const lser = [{ xs, ys: lr, color: '--rate', markers: true }, { xs, ys: li, color: '--speed', markers: true }];
-  plot($('#pLr'), { series: lser, nearest: true, zeroLine: true, xTicks: dayTicks, xFmt: dateFmt, yFmt: v => (v > 0 ? '+' : '') + v.toFixed(0) + '%', tip: (si, i) => `<b>${si ? 'Intensity' : 'Timing'} ${lser[si].ys[i] > 0 ? '+' : ''}${lser[si].ys[i].toFixed(1)}%</b><br>${esc(an[i].s.name)} · ${dateFmt(xs[i])}` });
+  plot($('#pLr'), { label: 'Left/right timing and intensity difference for each session, in percent.', series: lser, nearest: true, zeroLine: true, xTicks: dayTicks, xFmt: dateFmt, yFmt: v => (v > 0 ? '+' : '') + v.toFixed(0) + '%', tip: (si, i) => `<b>${si ? 'Intensity' : 'Timing'} ${lser[si].ys[i] > 0 ? '+' : ''}${lser[si].ys[i].toFixed(1)}%</b><br>${esc(an[i].s.name)}, ${dateFmt(xs[i])}` });
 }
 
 /* ---------- Sensor ---------- */
@@ -1019,7 +1025,7 @@ function renderSensor() {
     const st = BLE.status; const pctB = clamp(Math.round((st.mv - 3300) / 900 * 100), 0, 100);
     $('#sState').textContent = BLE.dev?.name || 'CatchSensor'; $('#sDetail').textContent = st.flashOk ? 'Connected. Clock synced.' : 'Connected, but the sensor reports a memory problem.';
     const strokesStored = Math.max(0, st.records); const cap = 131071;
-    $('#sTiles').innerHTML = `<div class="tile"><div class="k">Battery</div><div class="v">${pctB}<span class="u">% · ${(st.mv / 1000).toFixed(2)} V</span></div></div><div class="tile"><div class="k">Stored records</div><div class="v">${strokesStored.toLocaleString('en-GB')}</div></div><div class="tile"><div class="k">Memory used</div><div class="v">${(strokesStored / cap * 100).toFixed(1)}<span class="u">%</span></div></div><div class="tile"><div class="k">On for</div><div class="v">${fmtDur(st.millis + (Date.now() - BLE.statusAt))}</div></div>`;
+    $('#sTiles').innerHTML = `<div class="tile"><div class="k">Battery</div><div class="v">${pctB}<span class="u">%, ${(st.mv / 1000).toFixed(2)} V</span></div></div><div class="tile"><div class="k">Stored records</div><div class="v">${strokesStored.toLocaleString('en-GB')}</div></div><div class="tile"><div class="k">Memory used</div><div class="v">${(strokesStored / cap * 100).toFixed(1)}<span class="u">%</span></div></div><div class="tile"><div class="k">On for</div><div class="v">${fmtDur(st.millis + (Date.now() - BLE.statusAt))}</div></div>`;
   } else if (!BLE.connected) { $('#sState').textContent = 'Not connected'; $('#sDetail').textContent = 'Give the paddle a shake to wake the sensor (two green blinks), then press Connect.'; }
 }
 $('#btnConnect').onclick = async () => {

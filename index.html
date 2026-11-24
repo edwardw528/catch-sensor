@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Catch — paddle stroke analytics</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   color-scheme: light;
@@ -137,6 +140,22 @@ details summary{cursor:pointer;font-weight:700}
 .progress div{height:100%;background:var(--rate);width:0}
 .wk{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:13.5px}
 .wk .b{height:14px;background:var(--rate);border-radius:0 4px 4px 0;min-width:2px}
+.help{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--text2);font-size:12px;font-weight:700;cursor:pointer;padding:0;margin-left:6px;vertical-align:1px;line-height:1}
+.help:hover,.help[aria-expanded=true]{border-color:var(--text2);color:var(--text)}
+.pop{position:absolute;z-index:70;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:0 8px 28px rgba(0,0,0,.18);font-size:14px}
+.pop b{display:block;margin-bottom:4px}
+.pop p{margin:0;color:var(--text2);line-height:1.5}
+.lab{display:flex;align-items:center}
+.lab label{font-weight:500}
+.inp{padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);min-width:0}
+select.inp{max-width:100%}
+.pb{display:inline-block;font-size:12px;font-weight:700;color:var(--good);margin-left:6px}
+.mapbox{height:320px;border-radius:10px;overflow:hidden;margin-top:10px;background:var(--grid)}
+.cmp td.d{font-weight:600}
+.better{color:var(--good)} .worse{color:var(--warn)}
+.sel2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.sel2 label{font-size:13px;color:var(--text2);display:block;margin-bottom:4px}
+.key{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:0}
 @media (max-width:760px){
   header.top{padding:10px 14px}
   nav#nav{position:fixed;bottom:0;left:0;right:0;margin:0;justify-content:space-around;background:var(--card);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
@@ -148,6 +167,7 @@ details summary{cursor:pointer;font-weight:700}
   .metric .v{font-size:28px}
   .form{grid-template-columns:1fr}
   .lr{grid-template-columns:96px 1fr}
+  .sel2{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -209,6 +229,7 @@ details summary{cursor:pointer;font-weight:700}
 <section id="view-sessions" hidden></section>
 <section id="view-session" hidden></section>
 <section id="view-progress" hidden></section>
+<section id="view-compare" hidden></section>
 
 <!-- ================= SENSOR ================= -->
 <section id="view-sensor" hidden>
@@ -250,28 +271,36 @@ details summary{cursor:pointer;font-weight:700}
 <section id="view-settings" hidden>
   <h1>Settings</h1>
   <div class="card">
-    <div class="form">
-      <label for="setName">Your name</label><input type="text" id="setName" placeholder="Optional">
-      <label for="setSwap">Swap left / right</label><div><label class="row"><input type="checkbox" id="setSwap"> <span class="note">Tick this if the app shows your strokes on the wrong side (depends which way the sensor faces).</span></label></div>
-      <label>Rate zone boundaries (spm)</label><div><div class="zin" id="setZones"></div><p class="note">Recovery | Endurance | Tempo | Threshold | Race. Counting every stroke, left and right.</p></div>
-      <label>Target rate band (live)</label><div class="zin"><input type="number" id="setTlo"> <span class="note">to</span> <input type="number" id="setThi"></div>
-      <label for="setUnits">Speed units</label><select id="setUnits"><option value="kmh">km/h</option><option value="mps">m/s</option></select>
-      <label for="setGap">New session after a break of</label><div class="zin"><input type="number" id="setGap" min="1" max="120"> <span class="note">minutes (used when syncing)</span></div>
+    <div class="lab"><h3>Account</h3><button type="button" class="help" data-help="account" aria-label="About accounts" aria-expanded="false">?</button></div>
+    <div id="acctBody" style="margin-top:8px"></div>
+  </div>
+  <div class="card">
+    <div class="lab"><h3>Strava</h3><button type="button" class="help" data-help="strava" aria-label="About Strava" aria-expanded="false">?</button></div>
+    <div id="stravaBody" style="margin-top:8px"></div>
+  </div>
+  <div class="card">
+    <h3>Paddling</h3>
+    <div class="form" style="margin-top:12px">
+      <div class="lab"><label for="setName">Your name</label><button type="button" class="help" data-help="name" aria-label="About your name" aria-expanded="false">?</button></div><input type="text" id="setName" placeholder="Optional">
+      <div class="lab"><label for="setSwap">Swap left and right</label><button type="button" class="help" data-help="swap" aria-label="About swapping left and right" aria-expanded="false">?</button></div><div><input type="checkbox" id="setSwap"></div>
+      <div class="lab"><label>Rate zones (spm)</label><button type="button" class="help" data-help="zones" aria-label="About rate zones" aria-expanded="false">?</button></div><div><div class="zin" id="setZones"></div><p class="note">Recovery | Endurance | Tempo | Threshold | Race</p></div>
+      <div class="lab"><label>Target rate (live)</label><button type="button" class="help" data-help="target" aria-label="About the target rate" aria-expanded="false">?</button></div><div class="zin"><input type="number" id="setTlo" aria-label="Target from"> <span class="note">to</span> <input type="number" id="setThi" aria-label="Target to"> <span class="note">spm</span></div>
+      <div class="lab"><label for="setUnits">Speed units</label><button type="button" class="help" data-help="units" aria-label="About speed units" aria-expanded="false">?</button></div><select id="setUnits"><option value="kmh">km/h</option><option value="mps">m/s</option></select>
+      <div class="lab"><label for="setGap">Split sessions after</label><button type="button" class="help" data-help="gap" aria-label="About splitting sessions" aria-expanded="false">?</button></div><div class="zin"><input type="number" id="setGap" min="1" max="120"> <span class="note">minutes stopped</span></div>
     </div>
   </div>
   <div class="card">
     <h3>About and privacy</h3>
-    <p class="note" style="max-width:62ch;margin-top:4px">Catch keeps everything on this device. Sessions and settings are saved in this browser's storage and are never uploaded. GPS is only used while a live session is recording, and only to work out speed. There are no accounts, cookies, ads or analytics. Clearing your browser data deletes your sessions, so export a backup now and then.</p>
+    <p class="note" style="max-width:64ch;margin-top:4px">Without an account, everything stays in this browser on this device. If you sign in, your sessions are also saved to a database in London (Supabase), locked so only your account can read them. GPS is only used while a live session is recording. Route maps hide the first and last 200 m so they don't show where you start or finish. Uploading to Strava sends the full session to Strava, where Strava's own privacy settings apply. There are no ads, cookies or analytics. Deleting your account removes all your sessions from the database.</p>
   </div>
   <div class="card">
-    <h3>Your data</h3>
-    <p class="note">Everything is stored on this device only.</p>
+    <div class="lab"><h3>Your data</h3><button type="button" class="help" data-help="data" aria-label="About your data" aria-expanded="false">?</button></div>
     <div class="row" style="margin-top:10px">
       <button class="ghost" id="btnBackup">Export backup (.json)</button>
       <label class="btn ghost">Import backup<input type="file" id="inBackup" accept=".json,application/json" hidden></label>
       <button class="ghost" id="btnDemoAdd">Add demo sessions</button>
       <button class="ghost" id="btnDemoDel">Remove demo sessions</button>
-      <button class="ghost danger-text" id="btnWipe">Delete everything</button>
+      <button class="ghost danger-text" id="btnWipe">Clear this device</button>
     </div>
   </div>
 </section>
@@ -344,8 +373,22 @@ const Store = {
   async del(id) { if (!this.db) return; try { await this.req('readwrite', s => s.delete(id)); } catch (e) { } },
 };
 let sessions = [];
-async function saveSession(s) { const i = sessions.findIndex(x => x.id === s.id); if (i >= 0) sessions[i] = s; else sessions.push(s); anCache.delete(s.id); await Store.put(s); }
-async function deleteSession(id) { sessions = sessions.filter(s => s.id !== id); anCache.delete(id); await Store.del(id); }
+async function saveLocal(s) { const i = sessions.findIndex(x => x.id === s.id); if (i >= 0) sessions[i] = s; else sessions.push(s); anCache.delete(s.id); await Store.put(s); }
+async function deleteLocal(id) { sessions = sessions.filter(s => s.id !== id); anCache.delete(id); await Store.del(id); }
+// saveSession: save here, and to the account if signed in (demo sessions never leave the device)
+async function saveSession(s, touch = true) {
+  if (touch) { s.updatedAt = Date.now(); if (s.source !== 'demo') s.dirty = true; }
+  await saveLocal(s);
+  if (Cloud.user && s.source !== 'demo') { try { await Cloud.push(s); } catch (e) { Cloud.setStatus('Saved on this device. It will upload next time you sync.'); } }
+}
+async function deleteSession(id) {
+  const s = sessions.find(x => x.id === id);
+  await deleteLocal(id);
+  if (s && s.cloud) {
+    if (Cloud.user) { try { const { error } = await Cloud.sb.from('sessions').delete().eq('id', id); if (error) throw error; } catch (e) { Cloud.tomb(id); } }
+    else Cloud.tomb(id);
+  }
+}
 
 /* Session shape:
    { id, name, start, end, source:'sensor'|'live'|'demo', timeKnown, notes, rpe,
@@ -450,10 +493,40 @@ function analyze(s) {
   }
   const dpsAt = r => { const near = bins.filter(b => Math.abs(b.rate - r) <= 6); if (near.length >= 3) return mean(near.map(b => b.dps)); if (fit && r >= fit.lo && r <= fit.hi) return fit.a + fit.b * r; return null; };
   const A = { st, n, hasGps, pieces, whole, work, zones, bins, fit, dpsAt, t0: st[0]?.t, t1: st[n - 1] ? st[n - 1].t + st[n - 1].dur : 0 };
+  A.bests = hasGps ? bestEfforts(G) : {};
+  A.rateAt = t => { if (!n || t < A.t0 - 5000 || t > A.t1 + 5000) return null; let lo = 0, hi = n - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (st[m].t <= t) lo = m; else hi = m; } return st[lo].sm; };
   A.insights = buildInsights(A);
   anCache.set(s.id, { key, A });
   return A;
 }
+
+// Fastest time over set distances, from smoothed GPS speed
+const PB_DISTS = [200, 500, 1000];
+function bestEfforts(G) {
+  if (!G || G.t.length < 10) return {};
+  const t = G.t, d = [0];
+  for (let i = 1; i < t.length; i++) { const dt = (t[i] - t[i - 1]) / 1000; d.push(d[i - 1] + (dt > 0 && dt < 15 ? (G.v[i] + G.v[i - 1]) / 2 * dt : 0)); }
+  const out = {}, total = d[d.length - 1];
+  for (const D of PB_DISTS) {
+    if (total < D) continue;
+    let best = null, i = 0;
+    for (let j = 1; j < d.length; j++) {
+      while (i + 1 < j && d[j] - d[i + 1] >= D) i++;
+      if (d[j] - d[i] < D) continue;
+      const seg = d[i + 1] - d[i], frac = seg > 0 ? clamp((d[j] - d[i] - D) / seg, 0, 1) : 0;
+      const ts = t[i] + frac * (t[i + 1] - t[i]), time = t[j] - ts;
+      if (!best || time < best.time) best = { time, start: ts };
+    }
+    if (best) out[D] = best;
+  }
+  return out;
+}
+function allTimeBests() {
+  const out = {};
+  for (const s of sessions) { if (!s.timeKnown) continue; const b = analyze(s).bests; for (const D of PB_DISTS) if (b[D] && (!out[D] || b[D].time < out[D].time)) out[D] = { ...b[D], id: s.id, name: s.name, date: s.start }; }
+  return out;
+}
+const fmtTime = ms => { const s = ms / 1000; return s < 60 ? s.toFixed(1) + ' s' : `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`; };
 
 function buildInsights(A) {
   const out = []; const W = A.work; const where = A.pieces.length ? 'during your efforts' : 'across the session';
@@ -836,8 +909,8 @@ function updateLive() {
 let curView = 'sessions', curSession = null;
 function show(v) {
   curView = v; $$('main > section').forEach(s => s.hidden = s.id !== 'view-' + v);
-  $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.view === v || (v === 'session' && b.dataset.view === 'sessions')));
-  if (v === 'sessions') renderSessions(); if (v === 'progress') renderProgress(); if (v === 'sensor') renderSensor(); if (v === 'settings') renderSettings(); if (v === 'live') updateLive();
+  $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.view === v || ((v === 'session' || v === 'compare') && b.dataset.view === 'sessions')));
+  if (v === 'sessions') renderSessions(); if (v === 'progress') renderProgress(); if (v === 'sensor') renderSensor(); if (v === 'settings') renderSettings(); if (v === 'live') updateLive(); if (v === 'compare') renderCompare(); closePop();
   window.scrollTo(0, 0);
 }
 $$('#nav button').forEach(b => b.onclick = () => show(b.dataset.view));
@@ -848,18 +921,21 @@ const srcLabel = s => ({ sensor: 'Synced from sensor', live: 'Recorded live', de
 function renderSessions() {
   const v = $('#view-sessions');
   if (!sessions.length) {
-    v.innerHTML = `<div class="card empty"><h2>No sessions yet</h2><p class="sub">Go paddling with your sensor and sync it on the Sensor tab, or start a live session.<br>Want to look around first? Load some example sessions.</p><div class="row" style="justify-content:center;margin-top:18px"><button class="primary" id="eDemo">Load demo sessions</button><button class="ghost" id="eLive">Try the live simulator</button></div></div>`;
+    v.innerHTML = `<p class="note" id="syncLine" style="margin-top:8px">${Cloud.statusHtml()}</p><div class="card empty"><h2>No sessions yet</h2><p class="sub">Go paddling with your sensor and sync it on the Sensor tab, or start a live session.<br>Want to look around first? Load some example sessions.</p><div class="row" style="justify-content:center;margin-top:18px"><button class="primary" id="eDemo">Load demo sessions</button><button class="ghost" id="eLive">Try the live simulator</button></div></div>`;
     $('#eDemo').onclick = async () => { await addDemoSessions(); renderSessions(); };
+    wireSyncLine();
     $('#eLive').onclick = () => { $('#optSim').checked = true; show('live'); };
     return;
   }
   const list = [...sessions].sort((a, b) => b.start - a.start);
-  v.innerHTML = `<div class="row between"><h1>Sessions</h1><span class="note">${list.length} session${list.length > 1 ? 's' : ''}</span></div><div class="list" style="margin-top:14px">${list.map(s => {
+  v.innerHTML = `<div class="row between"><h1>Sessions</h1><div class="row"><span class="note">${list.length} session${list.length > 1 ? 's' : ''}</span>${list.length > 1 ? '<button class="ghost" id="cmpOpen">Compare</button>' : ''}</div></div><p class="note" id="syncLine">${Cloud.statusHtml()}</p><div class="list" style="margin-top:14px">${list.map(s => {
     const A = analyze(s), W = A.whole;
-    return `<button class="sess" data-id="${esc(s.id)}"><div><div class="nm">${esc(s.name)}</div><div class="meta">${s.timeKnown ? fmtDate(s.start) : 'Date unknown'}</div></div><div><span class="chip">${esc(srcLabel(s))}</span></div>
+    return `<button class="sess" data-id="${esc(s.id)}"><div><div class="nm">${esc(s.name)}</div><div class="meta">${s.timeKnown ? fmtDate(s.start) : 'Date unknown'}</div></div><div><span class="chip">${esc(srcLabel(s))}${Cloud.user && s.dirty && s.source !== 'demo' ? ', not uploaded yet' : ''}</span></div>
       <div class="st"><span><b>${fmtDur(W.time)}</b> time</span>${W.dist ? `<span><b>${(W.dist / 1000).toFixed(2)}</b> km</span>` : ''}<span><b>${Math.round(W.rate)}</b> avg spm</span>${W.dps ? `<span><b>${W.dps.toFixed(2)}</b> m/stroke</span>` : ''}<span><b>${A.pieces.length}</b> effort${A.pieces.length === 1 ? '' : 's'}</span>${s.rpe ? `<span>RPE <b>${s.rpe}</b></span>` : ''}</div></button>`;
   }).join('')}</div>`;
   $$('.sess', v).forEach(b => b.onclick = () => openSession(b.dataset.id));
+  if ($('#cmpOpen')) $('#cmpOpen').onclick = () => openCompare(list[0].id, list[1].id);
+  wireSyncLine();
 }
 function openSession(id) { curSession = id; show('session'); renderSession(); }
 
@@ -879,7 +955,7 @@ function renderSession() {
   const Wk = A.work;
   v.innerHTML = `
   <div class="row between"><button class="ghost" id="back">← Sessions</button>
-    <div class="row"><label class="btn ghost">Add GPS (.gpx)<input type="file" id="gpxIn" accept=".gpx,application/gpx+xml,application/xml" hidden></label><button class="ghost" id="csvBtn">Export CSV</button><button class="ghost danger-text" id="delBtn">Delete</button></div></div>
+    <div class="row"><label class="btn ghost">Add GPS (.gpx)<input type="file" id="gpxIn" accept=".gpx,application/gpx+xml,application/xml" hidden></label><button class="ghost" id="cmpBtn">Compare</button>${Cloud.user && s.source !== 'demo' ? (s.stravaId ? `<a class="btn ghost" href="https://www.strava.com/activities/${Number(s.stravaId)}" target="_blank" rel="noopener">On Strava ↗</a>` : `<button class="ghost" id="stravaBtn">Upload to Strava</button>`) : ''}<button class="ghost" id="csvBtn">Export CSV</button><button class="ghost danger-text" id="delBtn">Delete</button></div></div>
   <h1 contenteditable="true" spellcheck="false" id="sName" title="Click to rename">${esc(s.name)}</h1>
   <p class="sub">${s.timeKnown ? fmtDate(s.start) : 'Date unknown (sensor lost power before it was synced)'}</p><p class="note">${esc(srcLabel(s))}${s.gpsShift ? '. GPS lined up by start time' : ''}</p>
   <div class="tiles">
@@ -891,17 +967,18 @@ function renderSession() {
     ${W.speed ? tile('Avg split', fmtSplit(W.speed), '/500m') : ''}
     ${W.dps ? tile('Distance / stroke', W.dps.toFixed(2), 'm') : ''}
   </div>
+  ${PB_DISTS.some(D => A.bests[D]) ? (() => { const atb = allTimeBests(); return `<h2>Best efforts ${HELP_BTN('bests')}</h2><div class="tiles">${PB_DISTS.filter(D => A.bests[D]).map(D => { const b = A.bests[D], pb = atb[D] && atb[D].id === s.id && sessions.filter(x => analyze(x).bests[D]).length > 1; return `<div class="tile"><div class="k">Fastest ${D} m${pb ? '<span class="pb">PB</span>' : ''}</div><div class="v">${fmtTime(b.time)}</div><div class="note num">${fmtSplit(D / (b.time / 1000))} /500 m</div></div>`; }).join('')}</div>`; })() : ''}
   <h2>Key takeaways</h2>
   <div class="insights">${['focus', 'good', 'info'].filter(k => A.insights.some(i => i.k === k)).map(k => `<div class="ins-group ${k}"><h3>${{ focus: 'Work on', good: 'Going well', info: 'Also noticed' }[k]}</h3>${A.insights.filter(i => i.k === k).map(i => `<div class="ins"><h4>${esc(i.h)}</h4><p>${esc(i.p)}</p></div>`).join('')}</div>`).join('')}</div>
-  <div class="card"><h3>Stroke rate</h3><p class="note">Strokes per minute (left and right both count), smoothed over 6 strokes. Shaded areas are the efforts Catch detected.</p><div class="chart" id="cRate"></div></div>
-  ${A.hasGps ? `<div class="card"><h3>Boat speed</h3><p class="note">${speedUnit()}, GPS, smoothed over 6 s</p><div class="chart" id="cSpeed"></div></div>` : `<div class="card"><h3>No speed data for this session</h3><p class="note">Add a .gpx from your GPS watch or Strava (button above) to get splits, distance per stroke and your efficiency curve. In live mode the phone’s GPS is used automatically.</p></div>`}
-  <div class="card"><h3>Efforts</h3>${A.pieces.length ? `<p class="note">Detected where your rate rose clearly above your base pace for 30 s or more.</p><div class="scroll"><table><thead><tr><th>#</th><th>Start</th><th>Time</th>${A.hasGps ? '<th>Dist</th><th>Split</th><th>m/stroke</th>' : ''}<th>Rate</th><th>Rhythm</th><th>L/R timing</th><th>Fade</th></tr></thead><tbody>${A.pieces.map(p => {
+  <div class="card"><h3>Stroke rate ${HELP_BTN('rate')}</h3><p class="note">Strokes per minute (left and right both count), smoothed over 6 strokes. Shaded areas are the efforts Catch detected.</p><div class="chart" id="cRate"></div></div>
+  ${A.hasGps ? `<div class="card"><h3>Boat speed</h3><p class="note">${speedUnit()}, GPS, smoothed over 6 s</p><div class="chart" id="cSpeed"></div></div>${(s.gps || []).some(p => isFinite(p[2])) ? `<div class="card"><h3>Route ${HELP_BTN('map')}</h3><p class="note">Coloured by stroke rate. The first and last 200 m are hidden for privacy.</p><div class="mapbox" id="cMap"></div><div class="legend">${ZONE_NAMES.map((z, i) => `<span><i style="background:${MAP_COLORS[i]}"></i>${z}</span>`).join('')}</div></div>` : ''}` : `<div class="card"><h3>No speed data for this session</h3><p class="note">Add a .gpx from your GPS watch or Strava (button above) to get splits, distance per stroke and your efficiency curve. In live mode the phone’s GPS is used automatically.</p></div>`}
+  <div class="card"><h3>Efforts ${HELP_BTN('efforts')}</h3>${A.pieces.length ? `<p class="note">Detected where your rate rose clearly above your base pace for 30 s or more.</p><div class="scroll"><table><thead><tr><th>#</th><th>Start</th><th>Time</th>${A.hasGps ? '<th>Dist</th><th>Split</th><th>m/stroke</th>' : ''}<th>Rate</th><th>Rhythm</th><th>L/R timing</th><th>Fade</th></tr></thead><tbody>${A.pieces.map(p => {
       const d = (p.R.dur - p.L.dur) / ((p.L.dur + p.R.dur) / 2);
       const f = p.fade ? (p.fade.dps != null ? p.fade.dps : p.fade.inten) : null;
       return `<tr><td>${p.idx}</td><td>${elapsedFmt((p.t0 - A.t0) / 60000)}</td><td>${fmtDur(p.time)}</td>${A.hasGps ? `<td>${p.dist ? Math.round(p.dist) + ' m' : '–'}</td><td>${fmtSplit(p.speed)}</td><td>${p.dps ? p.dps.toFixed(2) : '–'}</td>` : ''}<td>${Math.round(p.rate)}</td><td>±${p.cv != null ? (p.cv * 100).toFixed(1) : '–'}%</td><td>${Math.abs(d) < 0.005 ? 'Even' : (d > 0 ? 'R' : 'L') + ' +' + Math.abs(d * 100).toFixed(1) + '%'}</td><td>${f == null ? '–' : (f < 0 ? '↓ ' : '↑ ') + Math.abs(f * 100).toFixed(0) + '%' + (p.fade.dps != null ? '' : ' int.')}</td></tr>`;
     }).join('')}</tbody></table></div><p class="note" style="margin-top:8px">Rhythm = how much the stroke cycle varied (lower is smoother). L/R timing = which side's stroke takes longer. Fade = change in distance per stroke from the first to the last third of the effort${A.hasGps ? '' : ' (pull intensity without GPS)'}.</p>` : `<p class="note">No distinct efforts found, so this looks like a steady session. All analysis below uses the whole session.</p>`}</div>
   <div class="grid2">
-    <div class="card"><h3>Left vs right</h3><p class="note">${A.pieces.length ? 'During efforts.' : 'Whole session.'} A dot in the green zone means the two sides are well matched.</p>
+    <div class="card"><h3>Left vs right ${HELP_BTN('lr')}</h3><p class="note">${A.pieces.length ? 'During efforts.' : 'Whole session.'} A dot in the green zone means the two sides are well matched.</p>
       <div class="lr">
         ${lrRow('Stroke time', 'catch to catch', Wk.L.dur, Wk.R.dur, x => Math.round(x) + ' ms')}
         ${lrRow('Blade in water', '% of stroke', Wk.L.water, Wk.R.water, x => x.toFixed(0) + '%')}
@@ -909,11 +986,11 @@ function renderSession() {
         ${lrRow('Pull intensity', 'paddle acceleration', Wk.L.inten, Wk.R.inten, x => x.toFixed(0), 5)}
         ${lrRow('Rotation speed', 'peak, °/s', Wk.L.gyro, Wk.R.gyro, x => Math.round(x), 5)}
       </div></div>
-    <div class="card"><h3>Time in rate zones</h3><p class="note">Based on your zone boundaries in Settings</p>
+    <div class="card"><h3>Time in rate zones ${HELP_BTN('zones')}</h3><p class="note">Based on your zone boundaries in Settings</p>
       <div class="zbar">${A.zones.map((t, i) => t ? `<div style="width:${t / zt * 100}%;background:var(${zc[i]})" title="${ZONE_NAMES[i]}: ${fmtDur(t)}"></div>` : '').join('')}</div>
       <div class="zl">${A.zones.map((t, i) => `<i style="background:var(${zc[i]})"></i><span>${ZONE_NAMES[i]} <span class="note">${zr(i)} spm</span></span><b class="num">${fmtDur(t)}</b><span class="note num">${Math.round(t / zt * 100)}%</span>`).join('')}</div></div>
   </div>
-  ${A.bins.length > 8 ? `<div class="card"><h3>Efficiency curve: rate vs distance per stroke</h3><p class="note">Each dot is 12 strokes. Paddling faster always shortens each stroke a bit; a flatter line means you keep more length as the rate goes up.</p><div class="chart" id="cEff"></div><div class="legend"><span><i style="background:var(--rate)"></i>12-stroke block</span>${A.fit ? '<span><i style="background:var(--text2);height:2px;vertical-align:3px"></i>Trend</span>' : ''}</div></div>` : ''}
+  ${A.bins.length > 8 ? `<div class="card"><h3>Efficiency curve: rate vs distance per stroke ${HELP_BTN('efficiency')}</h3><p class="note">Each dot is 12 strokes. Paddling faster always shortens each stroke a bit; a flatter line means you keep more length as the rate goes up.</p><div class="chart" id="cEff"></div><div class="legend"><span><i style="background:var(--rate)"></i>12-stroke block</span>${A.fit ? '<span><i style="background:var(--text2);height:2px;vertical-align:3px"></i>Trend</span>' : ''}</div></div>` : ''}
   <div class="card"><h3>How did it feel?</h3><p class="note">Rate of perceived exertion, 1 = very easy, 10 = all-out</p>
     <div class="rpe">${Array.from({ length: 10 }, (_, i) => `<button data-r="${i + 1}" class="${s.rpe === i + 1 ? 'on' : ''}">${i + 1}</button>`).join('')}</div>
     <textarea id="sNotes" placeholder="Notes: conditions, boat, how it went…">${esc(s.notes || '')}</textarea></div>
@@ -925,7 +1002,7 @@ function renderSession() {
   const xMax = (A.t1 - A.t0) / 60000;
   plot($('#cRate'), { label: `Stroke rate over ${fmtDur(W.time)}: average ${Math.round(W.rate)} spm, peak ${Math.round(maxRate)} spm, ${A.pieces.length} efforts. Full data in the stroke-by-stroke table.`, series: [{ xs, ys: A.st.map(x => x.sm), color: '--rate', gapAfter: 0.5 }], bands, xMin: 0, xMax, xFmt: minFmt, yFmt: v => Math.round(v), tip: (si, i) => `<b>${Math.round(A.st[i].sm)} spm</b>, ${elapsedFmt(xs[i])}` });
   if (A.hasGps) {
-    const G = smoothGps(s.gps.map(p => [p[0] + (s.gpsShift || 0), p[1], p[2], p[3]]));
+    const G = smoothGps(s.gps);
     const step = Math.max(1, Math.floor(G.t.length / 1500)); const gx = [], gy = [];
     for (let i = 0; i < G.t.length; i += step) { const m = (G.t[i] - A.t0) / 60000; if (m < 0 || m > xMax) continue; gx.push(m); gy.push(settings.units === 'mps' ? G.v[i] : G.v[i] * 3.6); }
     plot($('#cSpeed'), { label: `Boat speed over the session, average ${fmtSpeed(W.speed)} ${speedUnit()}.`, series: [{ xs: gx, ys: gy, color: '--speed' }], bands, xMin: 0, xMax, yMin: 0, xFmt: minFmt, yFmt: v => v.toFixed(settings.units === 'mps' ? 1 : 0), tip: (si, i) => `<b>${gy[i].toFixed(1)} ${speedUnit()}</b>, ${fmtSplit(settings.units === 'mps' ? gy[i] : gy[i] / 3.6)}/500m, ${elapsedFmt(gx[i])}` });
@@ -938,6 +1015,9 @@ function renderSession() {
 
   // wiring
   $('#back').onclick = () => show('sessions');
+  $('#cmpBtn').onclick = () => { const prev = [...sessions].filter(x => x.id !== s.id && x.start <= s.start).sort((a, b) => b.start - a.start)[0] || sessions.find(x => x.id !== s.id); openCompare(s.id, prev ? prev.id : null); };
+  if ($('#stravaBtn')) $('#stravaBtn').onclick = () => uploadToStrava(s, A, $('#stravaBtn'));
+  if ($('#cMap')) renderMap($('#cMap'), s, A);
   $('#sName').onblur = async e => { const n = e.target.textContent.trim().slice(0, 80); if (n && n !== s.name) { s.name = n; await saveSession(s); } };
   $('#sName').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } };
   $('#sNotes').onchange = async e => { s.notes = e.target.value; await saveSession(s); toast('Notes saved'); };
@@ -1001,9 +1081,10 @@ function renderProgress() {
   ${has1 || has2 ? `<div class="card"><h3>Distance per stroke at fixed rates</h3><p class="note">How far each stroke carries you at the same rate, which is the clearest sign of better technique and power. Higher is better.</p>
     <div class="chart" id="pDps"></div>
     <div class="legend">${has1 ? `<span><i style="background:var(--L)"></i>At ${rEnd} spm (endurance)${t1 != null ? `: ${t1 >= 0 ? '+' : ''}${t1.toFixed(2)} m since first session` : ''}</span>` : ''}${has2 ? `<span><i style="background:var(--R)"></i>At ${rRace} spm (race)${t2 != null ? `: ${t2 >= 0 ? '+' : ''}${t2.toFixed(2)} m since first session` : ''}</span>` : ''}</div></div>` : `<div class="card"><h3>Distance per stroke</h3><p class="note">Add GPS to your sessions to track stroke length over time.</p></div>`}
-  <div class="card"><h3>Left / right balance</h3><p class="note">0 = perfectly even. Above the line means that side's stroke takes longer or pulls harder.${tlr != null ? ` Timing gap ${tlr <= 0 ? 'shrank' : 'grew'} by ${Math.abs(tlr).toFixed(1)} points since your first session.` : ''}</p>
+  <div class="card"><h3>Left / right balance ${HELP_BTN('lr')}</h3><p class="note">0 = perfectly even. Above the line means that side's stroke takes longer or pulls harder.${tlr != null ? ` Timing gap ${tlr <= 0 ? 'shrank' : 'grew'} by ${Math.abs(tlr).toFixed(1)} points since your first session.` : ''}</p>
     <div class="chart" id="pLr"></div>
     <div class="legend"><span><i style="background:var(--rate)"></i>Timing: right longer (+) / left longer (−)</span><span><i style="background:var(--speed)"></i>Intensity: left harder (+) / right harder (−)</span></div></div>
+  ${(() => { const atb = allTimeBests(); return PB_DISTS.some(D => atb[D]) ? `<div class="card"><h3>Personal bests ${HELP_BTN('bests')}</h3><div class="scroll"><table><thead><tr><th>Distance</th><th>Time</th><th>Split</th><th>Session</th></tr></thead><tbody>${PB_DISTS.filter(D => atb[D]).map(D => `<tr><td>${D} m</td><td><b>${fmtTime(atb[D].time)}</b></td><td>${fmtSplit(D / (atb[D].time / 1000))} /500 m</td><td><a href="#" data-open="${esc(atb[D].id)}">${esc(atb[D].name)}, ${fmtDate(atb[D].date, false)}</a></td></tr>`).join('')}</tbody></table></div></div>` : ''; })()}
   <div class="card"><h3>Weekly volume</h3><div class="wk" style="margin-top:10px">${weeks.map(([k, o]) => `<span class="note">w/c ${dateFmt(k)}</span><div><div class="b" style="width:${o.min / maxMin * 100}%"></div></div><span class="num">${Math.round(o.min)} min${o.km ? `, ${o.km.toFixed(1)} km` : ''}, ${o.n}×</span>`).join('')}</div></div>`;
   const dayTicks = (a, b) => { const n = Math.min(list.length, 5); return Array.from({ length: n }, (_, i) => a + (b - a) * i / (n - 1 || 1)); };
   if ($('#pDps')) {
@@ -1011,6 +1092,7 @@ function renderProgress() {
     const ser = []; if (has1) ser.push(mk(d1, '--L')); if (has2) ser.push(mk(d2, '--R'));
     plot($('#pDps'), { label: 'Distance per stroke at fixed rates for each session.', series: ser, nearest: true, xMin: xs[0], xMax: xs[xs.length - 1], xTicks: dayTicks, xFmt: dateFmt, yFmt: v => v.toFixed(2) + ' m', tip: (si, i) => { const k = ser[si].idx[i]; return `<b>${ser[si].ys[i].toFixed(2)} m/stroke</b><br>${esc(an[k].s.name)}, ${dateFmt(xs[k])}`; } });
   }
+  $$('[data-open]', v).forEach(a => a.onclick = e => { e.preventDefault(); openSession(a.dataset.open); });
   const lser = [{ xs, ys: lr, color: '--rate', markers: true }, { xs, ys: li, color: '--speed', markers: true }];
   plot($('#pLr'), { label: 'Left/right timing and intensity difference for each session, in percent.', series: lser, nearest: true, zeroLine: true, xTicks: dayTicks, xFmt: dateFmt, yFmt: v => (v > 0 ? '+' : '') + v.toFixed(0) + '%', tip: (si, i) => `<b>${si ? 'Intensity' : 'Timing'} ${lser[si].ys[i] > 0 ? '+' : ''}${lser[si].ys[i].toFixed(1)}%</b><br>${esc(an[i].s.name)}, ${dateFmt(xs[i])}` });
 }
@@ -1052,6 +1134,7 @@ $('#btnErase').onclick = async () => {
 
 /* ---------- Settings ---------- */
 function renderSettings() {
+  renderAccount(); renderStrava();
   $('#setName').value = settings.name; $('#setSwap').checked = settings.swap; $('#setUnits').value = settings.units; $('#setGap').value = settings.gapMin;
   $('#setTlo').value = settings.target[0]; $('#setThi').value = settings.target[1];
   $('#setZones').innerHTML = settings.zones.map((z, i) => `<input type="number" data-i="${i}" value="${z}" aria-label="Zone boundary ${i + 1}">`).join('');
@@ -1069,7 +1152,351 @@ $('#inBackup').onchange = async e => {
 };
 $('#btnDemoAdd').onclick = async () => { await addDemoSessions(); };
 $('#btnDemoDel').onclick = async () => { const d = sessions.filter(s => s.source === 'demo'); for (const s of d) await deleteSession(s.id); toast(`Removed ${d.length} demo session${d.length === 1 ? '' : 's'}`); };
-$('#btnWipe').onclick = async () => { if (await confirmBox('Delete all sessions?', 'Everything stored in Catch on this device will be removed. Export a backup first if you want to keep it.', 'Delete everything', true)) { for (const s of [...sessions]) await deleteSession(s.id); toast('All sessions deleted'); } };
+$('#btnWipe').onclick = async () => { if (await confirmBox('Clear this device?', Cloud.user ? 'Removes all sessions stored in this browser. Sessions already saved to your account stay there and come back next time you sync.' : 'Removes all sessions stored in this browser. You are not signed in, so they are not saved anywhere else. Export a backup first if you want to keep them.', 'Clear', true)) { for (const s of [...sessions]) await deleteLocal(s.id); toast('This device has been cleared'); } };
+
+/* =====================================================================
+   HELP POPOVERS  (tap a "?" for a plain-English explanation)
+   ===================================================================== */
+const HELP = {
+  account: ['Your account', 'Sign in to save sessions online, so they show up in every browser and device (Bluefy, Safari, your laptop). There\'s no password: we email you a one-time code. Your sessions are locked to your account, so nobody else can read them, teammates included.'],
+  strava: ['Strava', 'Send a session to Strava as a kayaking activity, with your route, distance and stroke rate (shown as cadence). Once it\'s on Strava, Strava\'s own privacy settings apply, so set up a privacy zone there if you want your start and finish hidden.'],
+  name: ['Your name', 'Optional. Just for you, it isn\'t shared anywhere.'],
+  swap: ['Swap left and right', 'The sensor tells left from right by which way the shaft tips, so clamping it the other way round flips them. To check: do 10 strokes on your left side only. If Catch calls them right strokes, tick this box.'],
+  zones: ['Rate zones', 'These numbers split stroke rate into five training zones: Recovery, Endurance, Tempo, Threshold and Race. Each number is where one zone ends and the next begins, in strokes per minute (left and right both count). For example, with 80 and 95, anything from 80 to 94 spm counts as Tempo. Set them to match your coach\'s zones. They drive the "Time in rate zones" bar and the route map colours.'],
+  target: ['Target rate', 'Only used in live mode. Set the stroke rate you\'re aiming to hold today, e.g. 100 to 110 for a threshold piece. The big rate number then says "On target" when you\'re inside the band, or warns you when you drift above or below it.'],
+  units: ['Speed units', 'How boat speed is shown: kilometres per hour or metres per second. Splits are always per 500 m.'],
+  gap: ['Split sessions after', 'The sensor records every stroke in one long list. When you sync, Catch starts a new session wherever you stopped paddling for longer than this. 5 minutes suits most outings. Raise it if you take long rests and want one outing kept as a single session; lower it to split back-to-back pieces.'],
+  data: ['Your data', 'Export backup saves every session on this device to a file. Import adds them back, e.g. on a new phone. "Clear this device" only removes sessions from this browser. If you\'re signed in, they stay safe in your account.'],
+  rate: ['Stroke rate', 'Strokes per minute, counting every stroke on both sides, the same way SpeedCoach and Vaaka count. Smoothed over 6 strokes, so single wobbles don\'t show.'],
+  efforts: ['Efforts', 'Catch finds your hard pieces automatically: anywhere your rate rises clearly above your normal pace for at least 30 seconds. Rhythm is how much your stroke timing varied (lower is smoother). Fade compares distance per stroke in the last third of an effort with the first third.'],
+  lr: ['Left vs right', 'Compares your two sides. Stroke time is catch to catch. Blade in water is the share of each stroke the blade spends down. Pull intensity comes from how hard the paddle accelerates, so it shows effort, not exact force. The green zone means within a few percent, which is well balanced.'],
+  efficiency: ['Efficiency curve', 'Each dot is 12 strokes: how fast you were rating and how far each stroke carried the boat. Everyone loses some distance per stroke as rate goes up. A flatter line means you keep your length better at high rates, which is the sign of good technique and power.'],
+  bests: ['Best efforts', 'Your fastest time over 200 m, 500 m and 1000 m within a session, worked out from GPS speed. PB marks your best of all time. GPS has some error, so treat short distances as a guide.'],
+  map: ['Route', 'Your GPS track coloured by stroke rate zone. The first and last 200 m are cut off, so the map never shows where you launch or live.'],
+};
+const HELP_BTN = k => `<button type="button" class="help" data-help="${k}" aria-label="About ${esc((HELP[k] || [''])[0]).toLowerCase()}" aria-expanded="false">?</button>`;
+let openPop = null;
+function closePop() { if (openPop) { openPop.btn.setAttribute('aria-expanded', 'false'); openPop.el.remove(); openPop = null; } }
+document.addEventListener('click', e => {
+  const b = e.target.closest('.help');
+  if (b) {
+    e.preventDefault(); e.stopPropagation();
+    const same = openPop && openPop.btn === b; closePop(); if (same) return;
+    const h = HELP[b.dataset.help]; if (!h) return;
+    const el = document.createElement('div'); el.className = 'pop'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', h[0]);
+    el.innerHTML = `<b>${esc(h[0])}</b><p>${esc(h[1])}</p>`;
+    document.body.appendChild(el);
+    const r = b.getBoundingClientRect(), w = Math.min(320, innerWidth - 24);
+    el.style.width = w + 'px';
+    el.style.left = clamp(r.left + r.width / 2 - w / 2, 12, innerWidth - w - 12) + scrollX + 'px';
+    el.style.top = r.bottom + scrollY + 8 + 'px';
+    b.setAttribute('aria-expanded', 'true'); openPop = { btn: b, el };
+    return;
+  }
+  if (openPop && !e.target.closest('.pop')) closePop();
+}, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePop(); });
+addEventListener('resize', closePop);
+
+/* =====================================================================
+   ROUTE MAP (Leaflet + OpenStreetMap), start/finish 200 m hidden
+   ===================================================================== */
+const MAP_COLORS = ['#9aa0a6', '#3987e5', '#1baf7a', '#eda100', '#e34948'];
+function renderMap(el, s, A) {
+  if (!window.L) { el.outerHTML = '<p class="note">The map needs an internet connection, and doesn\'t load inside the Claude preview.</p>'; return; }
+  const G = (s.gps || []).filter(p => isFinite(p[2]) && isFinite(p[3])).sort((a, b) => a[0] - b[0]);
+  const cum = [0];
+  for (let i = 1; i < G.length; i++) cum.push(cum[i - 1] + haversine(G[i - 1][2], G[i - 1][3], G[i][2], G[i][3]));
+  const total = cum[cum.length - 1] || 0;
+  if (total < 500) { el.outerHTML = '<p class="note">This route is too short to show with the start and finish hidden.</p>'; return; }
+  const keep = G.filter((p, i) => cum[i] >= 200 && cum[i] <= total - 200);
+  const map = L.map(el, { scrollWheelZoom: false, dragging: !L.Browser.mobile, tap: false });
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+  let cur = null, pts = [];
+  const draw = () => { if (pts.length > 1) L.polyline(pts, { color: MAP_COLORS[cur], weight: 5, opacity: 0.95 }).addTo(map); };
+  for (const p of keep) {
+    const r = A.rateAt(p[0]), zz = r == null ? 0 : zoneOf(r), ll = [p[2], p[3]];
+    if (cur === null) { cur = zz; pts = [ll]; continue; }
+    pts.push(ll);
+    if (zz !== cur) { draw(); cur = zz; pts = [ll]; }
+  }
+  draw();
+  map.fitBounds(L.latLngBounds(keep.map(p => [p[2], p[3]])), { padding: [16, 16] });
+  setTimeout(() => map.invalidateSize(), 60);
+}
+
+/* =====================================================================
+   ACCOUNT + ONLINE SYNC (Supabase; each account can only read its own rows)
+   ===================================================================== */
+const SUPA_URL = 'https://goulaxtxmxahnoreqmxr.supabase.co';
+const SUPA_KEY = 'sb_publishable_a02ZOw_gCzwensnAqHgIiA_AzdfepV5';   // publishable key: safe in the page, the database rules do the protecting
+const Cloud = {
+  sb: null, user: null, available: false, syncing: false, lastSync: null, msg: '', pendingEmail: null,
+  init() {
+    try {
+      if (!window.supabase || framed) return;
+      this.sb = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+      this.available = true;
+      this.sb.auth.onAuthStateChange((ev, sess) => {
+        const was = this.user && this.user.id;
+        this.user = sess ? sess.user : null;
+        if (this.user && this.user.id !== was) setTimeout(() => this.sync(), 0);
+        if (curView === 'settings') { renderAccount(); renderStrava(); }
+        this.paint();
+      });
+    } catch (e) { this.available = false; }
+  },
+  statusHtml() {
+    if (!this.available) return framed ? 'Sessions are saved on this device. Online saving works when you open Catch from your own link.' : 'Sessions are saved on this device only.';
+    if (!this.user) return 'Sessions are saved on this device only. <a href="#" data-go-acct>Sign in</a> to keep them online and see them on every device.';
+    if (this.syncing) return 'Syncing with your account…';
+    if (this.msg) return esc(this.msg) + ' <a href="#" data-sync>Try again</a>';
+    return this.lastSync ? `Synced with your account ${ago(this.lastSync)}. <a href="#" data-sync>Sync now</a>` : '<a href="#" data-sync>Sync now</a>';
+  },
+  setStatus(m) { this.msg = m || ''; this.paint(); },
+  paint() { for (const id of ['#syncLine', '#acctSync']) { const el = $(id); if (el) el.innerHTML = this.statusHtml(); } wireSyncLine(); },
+  tombs() { try { return JSON.parse(localStorage.getItem('catch-deleted') || '[]'); } catch (e) { return []; } },
+  tomb(id) { const t = this.tombs(); if (!t.includes(id)) t.push(id); try { localStorage.setItem('catch-deleted', JSON.stringify(t)); } catch (e) { } },
+  toRow(s) {
+    return { user_id: this.user.id, id: s.id, name: (s.name || 'Session').slice(0, 120), start_at: new Date(s.start).toISOString(), end_at: new Date(s.end || s.start).toISOString(),
+      source: s.source === 'live' ? 'live' : 'sensor', time_known: !!s.timeKnown, notes: (s.notes || '').slice(0, 5000), rpe: s.rpe || null,
+      strokes: s.strokes, gps: s.gps || [], gps_shift: Math.round(s.gpsShift || 0), strava_activity_id: s.stravaId || null, updated_at: new Date(s.updatedAt || Date.now()).toISOString() };
+  },
+  fromRow(r) {
+    return { id: r.id, name: r.name, start: Date.parse(r.start_at), end: Date.parse(r.end_at), source: r.source, timeKnown: r.time_known, notes: r.notes, rpe: r.rpe,
+      strokes: r.strokes, gps: r.gps, gpsShift: r.gps_shift, stravaId: r.strava_activity_id, updatedAt: Date.parse(r.updated_at), cloud: true, dirty: false };
+  },
+  async push(s) {
+    const { error } = await this.sb.from('sessions').upsert(this.toRow(s), { onConflict: 'user_id,id' });
+    if (error) throw error;
+    s.cloud = true; s.dirty = false; await saveLocal(s);
+  },
+  async sync() {
+    if (!this.sb || !this.user || this.syncing) return;
+    this.syncing = true; this.msg = ''; this.paint();
+    try {
+      for (const id of this.tombs()) { const { error } = await this.sb.from('sessions').delete().eq('id', id); if (error) throw error; }
+      try { localStorage.setItem('catch-deleted', '[]'); } catch (e) { }
+      const { data: idx, error } = await this.sb.from('sessions').select('id,updated_at');
+      if (error) throw error;
+      const remote = new Map(idx.map(r => [r.id, Date.parse(r.updated_at)]));
+      const local = new Map(sessions.filter(x => x.source !== 'demo').map(x => [x.id, x]));
+      const need = idx.filter(r => { const l = local.get(r.id); return !l || (!l.dirty && (l.updatedAt || 0) < remote.get(r.id)); }).map(r => r.id);
+      for (let i = 0; i < need.length; i += 10) {
+        const { data, error: e2 } = await this.sb.from('sessions').select('*').in('id', need.slice(i, i + 10));
+        if (e2) throw e2;
+        for (const r of data) await saveLocal(this.fromRow(r));
+      }
+      for (const l of local.values()) {
+        if (!remote.has(l.id)) { if (l.cloud && !l.dirty) await deleteLocal(l.id); else await this.push(l); }   // deleted on another device, or new here
+        else if (l.dirty || (l.updatedAt || 0) > remote.get(l.id)) await this.push(l);
+      }
+      this.lastSync = Date.now();
+    } catch (e) { this.msg = 'Sync failed (' + (e.message || e) + '). Your sessions are still on this device.'; }
+    this.syncing = false; this.paint();
+    if (curView === 'sessions') renderSessions();
+    if (curView === 'progress') renderProgress();
+  },
+  async sendCode(email) {
+    const { error } = await this.sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname } });
+    if (error) throw error;
+  },
+  async verify(email, token) { const { error } = await this.sb.auth.verifyOtp({ email, token, type: 'email' }); if (error) throw error; },
+  async signOut() {
+    await this.sync();                                   // upload anything pending first
+    for (const s of sessions.filter(x => x.cloud && !x.dirty)) await deleteLocal(s.id);
+    await this.sb.auth.signOut(); this.lastSync = null; this.msg = '';
+  },
+  async deleteAccount() {
+    const { error } = await this.sb.rpc('delete_my_account');
+    if (error) throw error;
+    for (const s of sessions.filter(x => x.cloud)) await deleteLocal(s.id);
+    try { localStorage.removeItem('catch-deleted'); } catch (e) { }
+    await this.sb.auth.signOut().catch(() => { });
+    this.user = null; this.lastSync = null;
+  },
+};
+function ago(t) { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; }
+function wireSyncLine() {
+  $$('[data-sync]').forEach(a => a.onclick = e => { e.preventDefault(); Cloud.sync(); });
+  $$('[data-go-acct]').forEach(a => a.onclick = e => { e.preventDefault(); show('settings'); });
+}
+
+function renderAccount() {
+  const el = $('#acctBody'); if (!el) return;
+  if (!Cloud.available) { el.innerHTML = `<p class="note">${framed ? 'Accounts don\'t work inside this preview. Open Catch from your own link (your GitHub Pages address) to sign in.' : 'Couldn\'t reach the account service. Check your internet connection and reload.'}</p>`; return; }
+  if (Cloud.user) {
+    el.innerHTML = `<p style="margin:0">Signed in as <b>${esc(Cloud.user.email || '')}</b></p><p class="note" id="acctSync">${Cloud.statusHtml()}</p>
+      <div class="row" style="margin-top:10px"><button class="ghost" id="aSync">Sync now</button><button class="ghost" id="aOut">Sign out</button><button class="ghost danger-text" id="aDel">Delete account</button></div>`;
+    wireSyncLine();
+    $('#aSync').onclick = () => Cloud.sync();
+    $('#aOut').onclick = async () => { if (!await confirmBox('Sign out?', 'Your sessions stay safe in your account. They\'ll be removed from this browser and come back when you sign in again.', 'Sign out')) return; await Cloud.signOut(); toast('Signed out'); renderSettings(); };
+    $('#aDel').onclick = async () => { if (!await confirmBox('Delete your account?', 'This permanently deletes your account, every session saved to it and your Strava connection. It can\'t be undone. Sessions on this device that were never uploaded are kept.', 'Delete account', true)) return; try { await Cloud.deleteAccount(); toast('Account deleted'); } catch (e) { toast('Couldn\'t delete: ' + e.message); } renderSettings(); };
+    return;
+  }
+  if (Cloud.pendingEmail) {
+    el.innerHTML = `<p class="note">We've emailed a code to <b>${esc(Cloud.pendingEmail)}</b>. It can take a minute, so check your spam folder too.</p>
+      <div class="row" style="margin-top:10px"><input class="inp num" id="aCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Code from the email" aria-label="Code from the email"><button class="primary" id="aVerify">Sign in</button><button class="ghost" id="aBack">Use a different email</button></div>`;
+    $('#aVerify').onclick = async () => {
+      const c = $('#aCode').value.replace(/\D/g, '');
+      if (c.length < 6) { toast('Enter the code from the email'); return; }
+      $('#aVerify').disabled = true;
+      try { await Cloud.verify(Cloud.pendingEmail, c); Cloud.pendingEmail = null; toast('Signed in. Syncing your sessions…'); }
+      catch (e) { toast(e.message || 'That code didn\'t work'); }
+      renderAccount(); renderStrava();
+    };
+    $('#aBack').onclick = () => { Cloud.pendingEmail = null; renderAccount(); };
+    return;
+  }
+  el.innerHTML = `<p class="note">Save your sessions online so they show up in every browser and on every device. There's no password: we email you a code.</p>
+    <div class="row" style="margin-top:10px"><input class="inp" id="aEmail" type="email" autocomplete="email" placeholder="you@example.com" aria-label="Email address"><button class="primary" id="aSend">Email me a code</button></div>`;
+  $('#aSend').onclick = async () => {
+    const e = $('#aEmail').value.trim();
+    if (!/^\S+@\S+\.\S+$/.test(e)) { toast('Enter a valid email address'); return; }
+    $('#aSend').disabled = true;
+    try { await Cloud.sendCode(e); Cloud.pendingEmail = e; } catch (err) { toast(err.message || 'Couldn\'t send the code'); }
+    renderAccount();
+  };
+}
+
+/* =====================================================================
+   STRAVA (OAuth + upload go through the 'strava' server function;
+   the client secret and tokens never reach the browser)
+   ===================================================================== */
+async function strava(action, extra = {}) {
+  const { data, error } = await Cloud.sb.functions.invoke('strava', { body: { action, ...extra } });
+  if (error) { let msg = error.message; try { const j = await error.context.json(); msg = j.error || msg; } catch (e) { } throw new Error(msg); }
+  return data;
+}
+async function renderStrava() {
+  const el = $('#stravaBody'); if (!el) return;
+  if (!Cloud.available || !Cloud.user) { el.innerHTML = '<p class="note">Sign in above first. Strava needs an account so your connection can be kept safely on the server.</p>'; return; }
+  el.innerHTML = '<p class="note">Checking…</p>';
+  try {
+    const [cfg, st] = await Promise.all([strava('config'), strava('status').catch(() => ({ connected: false }))]);
+    if (!cfg.configured) { el.innerHTML = '<p class="note">Strava isn\'t switched on for this app yet. The app owner needs to add the Strava client ID and secret to the server.</p>'; return; }
+    if (st.connected) {
+      el.innerHTML = `<p style="margin:0">Connected${st.athleteName ? ` as <b>${esc(st.athleteName)}</b>` : ''}. Use "Upload to Strava" on any session.</p><div class="row" style="margin-top:10px"><button class="ghost" id="sDisc">Disconnect</button></div>`;
+      $('#sDisc').onclick = async () => { try { await strava('disconnect'); toast('Strava disconnected'); } catch (e) { toast(e.message); } renderStrava(); };
+    } else {
+      el.innerHTML = `<p class="note">Connect once, then upload any session as a kayaking activity.</p><div class="row" style="margin-top:10px"><button class="primary" id="sConn" style="background:#fc4c02;border-color:#fc4c02;color:#fff">Connect with Strava</button></div>`;
+      $('#sConn').onclick = () => {
+        const state = uid(); try { localStorage.setItem('catch-strava-state', state); } catch (e) { }
+        const q = new URLSearchParams({ client_id: cfg.clientId, response_type: 'code', redirect_uri: location.origin + location.pathname, approval_prompt: 'auto', scope: 'activity:write', state });
+        location.href = 'https://www.strava.com/oauth/authorize?' + q;
+      };
+    }
+  } catch (e) { el.innerHTML = `<p class="note">Couldn't check Strava: ${esc(e.message)}</p>`; }
+}
+async function handleStravaReturn() {
+  const q = new URLSearchParams(location.search);
+  if (!q.has('code') && !q.has('error')) return;
+  history.replaceState(null, '', location.pathname);
+  let saved = null; try { saved = localStorage.getItem('catch-strava-state'); localStorage.removeItem('catch-strava-state'); } catch (e) { }
+  if (q.get('error')) { toast('Strava connection cancelled'); return; }
+  if (!saved || saved !== q.get('state')) { toast('That Strava connection didn\'t start in this browser. Please try again.'); return; }
+  if (!Cloud.user) { toast('Sign in first, then connect Strava'); return; }
+  try { const r = await strava('connect', { code: q.get('code'), scope: q.get('scope') || '' }); toast(`Strava connected${r.athleteName ? ' as ' + r.athleteName : ''}`); }
+  catch (e) { toast('Strava: ' + e.message, 6000); }
+  show('settings');
+}
+function buildTcx(s, A) {
+  const iso = t => new Date(t).toISOString();
+  const G = (s.gps || []).filter(p => p[0] >= A.t0 - 60000 && p[0] <= A.t1 + 60000).sort((a, b) => a[0] - b[0]);
+  const pts = []; let dist = 0;
+  if (G.length > 10) {
+    for (let i = 0; i < G.length; i++) {
+      if (i) { const dt = (G[i][0] - G[i - 1][0]) / 1000; if (dt > 0 && dt < 15) dist += (G[i][1] + G[i - 1][1]) / 2 * dt; }
+      pts.push({ t: G[i][0], lat: G[i][2], lon: G[i][3], d: dist, cad: A.rateAt(G[i][0]) });
+    }
+  } else for (let t = A.t0; t <= A.t1; t += 5000) pts.push({ t, cad: A.rateAt(t) });
+  const tp = pts.map(p => `<Trackpoint><Time>${iso(p.t)}</Time>${isFinite(p.lat) && isFinite(p.lon) ? `<Position><LatitudeDegrees>${(+p.lat).toFixed(6)}</LatitudeDegrees><LongitudeDegrees>${(+p.lon).toFixed(6)}</LongitudeDegrees></Position>` : ''}${p.d != null ? `<DistanceMeters>${p.d.toFixed(1)}</DistanceMeters>` : ''}${p.cad != null ? `<Cadence>${clamp(Math.round(p.cad), 0, 254)}</Cadence>` : ''}</Trackpoint>`).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2"><Activities><Activity Sport="Other"><Id>${iso(A.t0)}</Id><Lap StartTime="${iso(A.t0)}"><TotalTimeSeconds>${Math.round((A.t1 - A.t0) / 1000)}</TotalTimeSeconds><DistanceMeters>${dist.toFixed(1)}</DistanceMeters><Intensity>Active</Intensity><TriggerMethod>Manual</TriggerMethod><Track>${tp}</Track></Lap></Activity></Activities></TrainingCenterDatabase>`;
+}
+async function uploadToStrava(s, A, btn) {
+  if (!s.timeKnown) { toast('This session has no real date, so Strava can\'t place it.'); return; }
+  btn.disabled = true; btn.textContent = 'Uploading…';
+  try {
+    const W = A.whole;
+    const desc = [`Average rate ${Math.round(W.rate)} spm`, W.dps ? `${W.dps.toFixed(2)} m per stroke` : null, A.pieces.length ? `${A.pieces.length} efforts` : null].filter(Boolean).join(', ') + '. Recorded with Catch.';
+    let r = await strava('upload', { tcx: buildTcx(s, A), name: s.name, description: desc, externalId: 'catch-' + s.id });
+    for (let i = 0; i < 10 && r.pending; i++) { await new Promise(res => setTimeout(res, 3000)); r = await strava('uploadStatus', { uploadId: r.uploadId }); }
+    if (r.error) throw new Error(r.error);
+    if (!r.activityId) throw new Error('Strava is still processing it. Check your Strava feed in a minute.');
+    s.stravaId = r.activityId; await saveSession(s);
+    toast(r.duplicate ? 'It was already on Strava, so it\'s now linked' : 'Uploaded to Strava');
+    if (curView === 'session') renderSession();
+  } catch (e) { toast('Strava: ' + e.message, 6000); btn.disabled = false; btn.textContent = 'Upload to Strava'; }
+}
+
+/* =====================================================================
+   COMPARE TWO SESSIONS
+   ===================================================================== */
+let curCompare = [null, null];
+function openCompare(a, b) { curCompare = [a, b]; show('compare'); }
+function renderCompare() {
+  const v = $('#view-compare');
+  const list = [...sessions].sort((x, y) => y.start - x.start);
+  if (list.length < 2) { v.innerHTML = '<h1>Compare</h1><div class="card empty"><p class="sub">You need at least two sessions to compare.</p></div>'; return; }
+  const a = list.find(x => x.id === curCompare[0]) || list[0];
+  const b = list.find(x => x.id === curCompare[1] && x.id !== a.id) || list.find(x => x.id !== a.id);
+  curCompare = [a.id, b.id];
+  const opt = cur => list.map(x => `<option value="${esc(x.id)}"${x.id === cur ? ' selected' : ''}>${esc(x.name)}, ${x.timeKnown ? fmtDate(x.start, false) : 'date unknown'}</option>`).join('');
+  const A = analyze(a), B = analyze(b);
+  const med = X => { const c = (X.pieces.length ? X.pieces : [X.whole]).map(p => p.cv).filter(q => q != null); return c.length ? quantile(c, .5) : null; };
+  const lrT = X => { const W = X.work; return Math.abs((W.R.dur - W.L.dur) / ((W.L.dur + W.R.dur) / 2)); };
+  const lrI = X => { const W = X.work; return Math.abs((W.L.inten - W.R.inten) / ((W.L.inten + W.R.inten) / 2)); };
+  const fade = X => { const f = X.pieces.filter(p => p.fade && p.fade.dps != null); return f.length ? mean(f.map(p => p.fade.dps)) : null; };
+  const z = settings.zones, rEnd = Math.round((z[0] + z[1]) / 2 + 5), rRace = Math.round(z[3] + 3);
+  // [label, first, second, format, direction: 1 higher is better, -1 lower is better, 0 neither]
+  const rows = [
+    ['Time', A.whole.time, B.whole.time, fmtDur, 0],
+    ['Distance', A.whole.dist, B.whole.dist, x => (x / 1000).toFixed(2) + ' km', 0],
+    ['Strokes', A.n, B.n, x => x.toLocaleString('en-GB'), 0],
+    ['Average rate', A.whole.rate, B.whole.rate, x => Math.round(x) + ' spm', 0],
+    ['Average split', A.whole.speed, B.whole.speed, x => fmtSplit(x) + ' /500 m', 1],
+    ['Distance per stroke', A.whole.dps, B.whole.dps, x => x.toFixed(2) + ' m', 1],
+    [`Distance per stroke at ${rEnd} spm`, A.dpsAt(rEnd), B.dpsAt(rEnd), x => x.toFixed(2) + ' m', 1],
+    [`Distance per stroke at ${rRace} spm`, A.dpsAt(rRace), B.dpsAt(rRace), x => x.toFixed(2) + ' m', 1],
+    ['Fastest 500 m', A.bests[500] && A.bests[500].time, B.bests[500] && B.bests[500].time, fmtTime, -1],
+    ['Efforts', A.pieces.length, B.pieces.length, String, 0],
+    ['Rhythm variation', med(A), med(B), x => '±' + (x * 100).toFixed(1) + '%', -1],
+    ['Left/right timing gap', lrT(A), lrT(B), x => (x * 100).toFixed(1) + '%', -1],
+    ['Left/right pull gap', lrI(A), lrI(B), x => (x * 100).toFixed(1) + '%', -1],
+    ['Fade in efforts', fade(A), fade(B), x => pct(x, 1), 1],
+  ];
+  const ok = x => x != null && isFinite(x);
+  const change = (x, y, dir) => {
+    if (!ok(x) || !ok(y) || !dir) return '';
+    const rel = (y - x) / (Math.abs(x) || 1);
+    if (Math.abs(rel) < 0.005) return '<span class="note">About the same</span>';
+    return (y - x) * dir > 0 ? '<span class="better">▲ Better</span>' : '<span class="worse">▼ Worse</span>';
+  };
+  v.innerHTML = `<div class="row between"><button class="ghost" id="cBack">← Sessions</button></div>
+  <h1>Compare sessions</h1>
+  <div class="sel2"><div><label for="cmpA"><span class="key" style="background:var(--rate)"></span>First session</label><select class="inp" id="cmpA" style="width:100%">${opt(a.id)}</select></div>
+  <div><label for="cmpB"><span class="key" style="background:var(--speed)"></span>Second session</label><select class="inp" id="cmpB" style="width:100%">${opt(b.id)}</select></div></div>
+  <div class="card"><div class="scroll"><table class="cmp"><thead><tr><th></th><th>First</th><th>Second</th><th>Second vs first</th></tr></thead><tbody>
+  ${rows.filter(r => ok(r[1]) || ok(r[2])).map(r => `<tr><td>${r[0]}</td><td>${ok(r[1]) ? r[3](r[1]) : '–'}</td><td>${ok(r[2]) ? r[3](r[2]) : '–'}</td><td class="d">${change(r[1], r[2], r[4])}</td></tr>`).join('')}
+  </tbody></table></div></div>
+  <div class="card"><h3>Stroke rate ${HELP_BTN('rate')}</h3><p class="note">Minutes from the start of each session</p><div class="chart" id="cmpRate"></div>
+  <div class="legend"><span><i style="background:var(--rate)"></i>First</span><span><i style="background:var(--speed)"></i>Second</span></div></div>
+  ${A.bins.length > 8 && B.bins.length > 8 ? `<div class="card"><h3>Efficiency curve ${HELP_BTN('efficiency')}</h3><p class="note">Higher dots at the same rate mean more distance per stroke</p><div class="chart" id="cmpEff"></div>
+  <div class="legend"><span><i style="background:var(--rate)"></i>First</span><span><i style="background:var(--speed)"></i>Second</span></div></div>` : ''}`;
+  $('#cBack').onclick = () => show('sessions');
+  $('#cmpA').onchange = e => { curCompare = [e.target.value, e.target.value === b.id ? a.id : b.id]; renderCompare(); };
+  $('#cmpB').onchange = e => { curCompare = [e.target.value === a.id ? b.id : a.id, e.target.value]; renderCompare(); };
+  const xa = A.st.map(x => (x.t - A.t0) / 60000), xb = B.st.map(x => (x.t - B.t0) / 60000);
+  plot($('#cmpRate'), { label: 'Stroke rate of both sessions over time', series: [{ xs: xa, ys: A.st.map(x => x.sm), color: '--rate', width: 1.5 }, { xs: xb, ys: B.st.map(x => x.sm), color: '--speed', width: 1.5 }],
+    xMin: 0, xFmt: minFmt, yFmt: q => Math.round(q), tip: (si, i) => `<b>${si ? 'Second' : 'First'}: ${Math.round((si ? B : A).st[i].sm)} spm</b>, ${elapsedFmt((si ? xb : xa)[i])}` });
+  if ($('#cmpEff')) {
+    const ser = [{ xs: A.bins.map(q => q.rate), ys: A.bins.map(q => q.dps), color: '--rate', type: 'dot', r: 4, alpha: .5 },
+      { xs: B.bins.map(q => q.rate), ys: B.bins.map(q => q.dps), color: '--speed', type: 'dot', r: 4, alpha: .5 }];
+    for (const [X, col] of [[A, '--rate'], [B, '--speed']]) if (X.fit) ser.push({ xs: [X.fit.lo, X.fit.hi], ys: [X.fit.a + X.fit.b * X.fit.lo, X.fit.a + X.fit.b * X.fit.hi], color: col, width: 2, dash: [5, 4], noHover: true });
+    plot($('#cmpEff'), { label: 'Rate against distance per stroke for both sessions', height: 260, nearest: true, series: ser, xFmt: q => Math.round(q) + ' spm', yFmt: q => q.toFixed(2) + ' m',
+      tip: (si, i) => { const q = (si ? B : A).bins[i]; return `<b>${si ? 'Second' : 'First'}: ${q.dps.toFixed(2)} m/stroke</b> at ${Math.round(q.rate)} spm`; } });
+  }
+}
 
 /* ---------- live buttons ---------- */
 $('#btnStart').onclick = startLive;
@@ -1079,9 +1506,13 @@ $('#btnStop').onclick = stopLive;
 (async () => {
   await Store.init();
   sessions = await Store.all();
+  Cloud.init();
+  if (Cloud.sb) { try { const { data } = await Cloud.sb.auth.getSession(); Cloud.user = data.session ? data.session.user : null; } catch (e) { } }
   updatePill();
-  show(sessions.length ? 'sessions' : 'sessions');
+  show('sessions');
   if (!BLE.supported) $('#optSim').checked = true;
+  await handleStravaReturn();
+  if (Cloud.user) Cloud.sync();
 })();
 </script>
 </body>

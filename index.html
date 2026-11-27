@@ -252,16 +252,17 @@ select.inp{max-width:100%}
     <div id="syncProg" hidden><div class="progress"><div id="syncBar"></div></div><p class="note num" id="syncTxt"></p></div>
   </div>
   <div class="card">
-    <h3>Build your sensor (about £25)</h3>
-    <p class="note">Full instructions, wiring and firmware come with this app (HARDWARE.md and CatchSensor.ino).</p>
+    <h3>Build your sensor</h3>
+    <p class="note">Full instructions, wiring and soldering steps are in HARDWARE.md. Firmware: CatchSensor.ino (strokes) and GpsTest.ino (GPS check).</p>
     <div class="scroll"><table class="parts">
-      <thead><tr><th>Part</th><th>Why</th><th>Approx.</th></tr></thead>
+      <thead><tr><th>Part</th><th>Why</th></tr></thead>
       <tbody>
-        <tr><td>Seeed XIAO nRF52840 <b>Sense</b></td><td>Thumbnail-sized board with Bluetooth, motion sensor (IMU), 2 MB memory and battery charger all built in</td><td>£15</td></tr>
-        <tr><td>3.7 V LiPo, 300–500 mAh (e.g. 502535)</td><td>Many hours of paddling per charge</td><td>£5</td></tr>
-        <tr><td>JST-PH 2-pin connector</td><td>So the battery unplugs for long storage. No power switch: it wakes when you pick up the paddle and sleeps after 10 min still</td><td>£0.50</td></tr>
-        <tr><td>3D-printed clamshell clamp (PETG)</td><td>Holds it to the shaft; PETG copes with water and sun better than PLA</td><td>£1</td></tr>
-        <tr><td>1.5 mm nitrile O-ring cord, 2× M3 stainless bolts + heat-set inserts, silica gel sachet</td><td>Watertight seal and closure</td><td>£3</td></tr>
+        <tr><td>Seeed XIAO nRF52840 <b>Sense</b></td><td>Thumbnail-sized board with Bluetooth, motion sensor (IMU), 2 MB memory and battery charger all built in</td></tr>
+        <tr><td>3.7 V LiPo, 300 mAh, JST-PH plug</td><td>Many hours of paddling per charge</td></tr>
+        <tr><td>JST-PH 2.0 loose header, wired as a pigtail</td><td>The battery plugs into it, so it unplugs for storage. No power switch: it wakes when you pick up the paddle and sleeps after 10 min still</td></tr>
+        <tr><td>ATGM336H GPS + ceramic antenna</td><td>Speed, splits and route without carrying a phone</td></tr>
+        <tr><td>3D-printed pod (PETG) + TPU strap</td><td>Pod sits on the shaft on a 1 mm rubber pad; the stretchy strap holds it tight. PETG copes with water and sun better than PLA</td></tr>
+        <tr><td>3 mm nitrile O-ring cord, 4× M3 × 8 bolts + heat-set inserts, silica gel sachet</td><td>Watertight seal and closure</td></tr>
       </tbody>
     </table></div>
   </div>
@@ -740,11 +741,12 @@ async function addDemoSessions() {
    ===================================================================== */
 const U = x => `7e1a00${x}-5a4b-4c3d-9e2f-1b0c0d0e0f10`;
 const UUIDS = { svc: U('01'), live: U('02'), data: U('03'), ctrl: U('04'), status: U('05') };
-const REC = { STROKE: 1, BOOT: 2, TIMESYNC: 3, END: 0xEE };
+const REC = { STROKE: 1, BOOT: 2, TIMESYNC: 3, GPS: 4, END: 0xEE };
 function parseRec(dv, o) {
   const type = dv.getUint8(o);
   const r = { type, side: dv.getUint8(o + 1), bootId: dv.getUint16(o + 2, true), tMs: dv.getUint32(o + 4, true), dur: dv.getUint16(o + 8, true), water: dv.getUint16(o + 10, true), gyro: dv.getInt16(o + 12, true), tilt: dv.getUint8(o + 14), inten: dv.getUint8(o + 15) };
   if (type === REC.TIMESYNC) r.epoch = dv.getUint32(o + 8, true);
+  if (type === REC.GPS) { r.spd = dv.getUint8(o + 1) / 20; r.lat = dv.getInt32(o + 8, true) / 1e7; r.lon = dv.getInt32(o + 12, true) / 1e7; }   // firmware v2: sensor GPS
   return r;
 }
 const BLE = {
@@ -795,22 +797,26 @@ const BLE = {
 function existingKeys() { const k = new Set(); for (const s of sessions) for (const x of s.strokes) if (x[7] != null) k.add(x[7]); return k; }
 function recordsToSessions(recs) {
   const off = {};
-  for (const r of recs) if (r.type === REC.TIMESYNC) off[r.bootId] = r.epoch * 1000 - r.tMs;
+  for (const r of recs) if (r.type === REC.TIMESYNC) off[r.bootId] = r.epoch * 1000 - r.tMs;   // phone or sensor GPS clock
   if (BLE.status && off[BLE.status.bootId] == null) off[BLE.status.bootId] = BLE.bootOffset();
   const keys = existingKeys(); const gap = settings.gapMin * 60000;
-  const groups = []; let cur = null, prev = null;
+  const groups = []; const gpsRecs = []; let cur = null, prev = null;
+  const toTime = (r, known) => known ? off[r.bootId] + r.tMs : Date.now() - 86400000 + r.tMs;
   for (const r of recs) {
+    if (r.type === REC.GPS) { gpsRecs.push(r); continue; }
     if (r.type !== REC.STROKE) continue;
-    if (!cur || r.bootId !== prev.bootId || r.tMs - prev.tMs > gap || r.tMs < prev.tMs) { cur = { known: off[r.bootId] != null, strokes: [] }; groups.push(cur); }
-    prev = r;
+    if (!cur || r.bootId !== prev.bootId || r.tMs - prev.tMs > gap || r.tMs < prev.tMs) { cur = { known: off[r.bootId] != null, boot: r.bootId, ms0: r.tMs, ms1: r.tMs, strokes: [] }; groups.push(cur); }
+    prev = r; cur.ms1 = r.tMs + r.dur;
     const key = r.bootId * 4294967296 + r.tMs; if (keys.has(key)) continue;
-    const t = cur.known ? off[r.bootId] + r.tMs : Date.now() - 86400000 + r.tMs;
-    cur.strokes.push([t, r.side, r.dur, r.water, r.gyro, r.tilt, r.inten, key]);
+    cur.strokes.push([toTime(r, cur.known), r.side, r.dur, r.water, r.gyro, r.tilt, r.inten, key]);
   }
   return groups.filter(g => g.strokes.length >= 30).map(g => {
     const st = g.strokes, start = st[0][0], end = st[st.length - 1][0] + st[st.length - 1][2];
     const h = new Date(start).getHours();
-    return { id: uid(), name: `${h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening'} paddle`, start, end, source: 'sensor', timeKnown: g.known, notes: '', rpe: null, strokes: st, gps: [] };
+    // sensor GPS points from the same power-up, from 1 min before the first stroke to 1 min after the last
+    const gps = gpsRecs.filter(r => r.bootId === g.boot && r.tMs >= g.ms0 - 60000 && r.tMs <= g.ms1 + 60000)
+      .map(r => [toTime(r, g.known), r.spd, r.lat, r.lon]);
+    return { id: uid(), name: `${h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening'} paddle`, start, end, source: 'sensor', timeKnown: g.known, notes: '', rpe: null, strokes: st, gps };
   });
 }
 
